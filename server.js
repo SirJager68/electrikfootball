@@ -30,6 +30,10 @@ const wss = process.env.NODE_ENV === 'production'
     ? new WebSocketServer({ server }) // Heroku: Share port with Express
     : new WebSocketServer({ port: 8080 }); // Local: WebSocket on 8080
 
+const PORT = process.env.NODE_ENV === 'production' ? process.env.PORT : 3001;
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
+});
 // ======================================= END SERVER SEUP
 
 // ======================================= CREATE GAME ID
