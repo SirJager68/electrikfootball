@@ -20,6 +20,7 @@ const plays = require('./public/js/plays.js');
 const app = express();
 app.use(express.static('public')); // Serve static files
 app.get('/', (req, res) => res.sendFile(__dirname + '/index.html'));
+app.get('/game.html', (req, res) => res.sendFile(__dirname + '/game.html')); // Serve game.html
 
 // Create HTTP server for Express
 const server = http.createServer(app);
