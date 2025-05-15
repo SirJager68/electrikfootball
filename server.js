@@ -5,7 +5,7 @@ console.log('********* SERVER.JS START   ************')
 console.log('****************************************')
 console.log('** started ', new Date().toLocaleString());
 console.log('****************************************')
-console.log('server.js loading...');
+console.log('server.js loading....');
 
 // ================= SETUP WEBSOCKET USING type commonjs from package-json
 // ================= SERVER SETUP
