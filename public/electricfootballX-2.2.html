@@ -1,0 +1,3588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Electrik Football - Classic vibrations now online</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
+  <style>
+    body { margin: 0; background: #222; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; color: #fff; }
+    canvas { background: #228B22; border: 2px solid #fff; margin-top: 10px; cursor: pointer; }
+    .controls { margin-top: 10px; text-align: center; max-width: 800px; }
+    .control-group { margin: 6px 0; }
+    label { margin-right: 8px; }
+    button { margin-top: 4px; }
+    /* Base font for the scoreboard */
+    #scoreboard {
+        font-family: 'Roboto', sans-serif;
+        color: #fff;
+    }
+    /* Main container styling with gradient background */
+    .scoreboard-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        background: linear-gradient(135deg, #1e1e1e, #414141);
+        padding: 15px 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Styling for team scores */
+    .team-score {
+        font-size: 1.2em;
+        font-weight: bold;
+        padding: 8px 12px;
+        border-radius: 5px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+    .team-score.has-ball {
+            outline: 2px solid #00ffff; /* Highlight for team with ball */
+            box-shadow: 0 0 10px #00ffff;
+        }
+    /* Specific team color styling */
+    .team1-score {
+        background: #2c3e50;
+        color: #ecf0f1;
+    }
+
+    .team2-score {
+        background: #2c3e50;
+        color: #ecf0f1;
+    }
+
+    /* Styling for the game clock */
+    #gameClock {
+        font-size: 1.5em;
+        font-weight: 700;
+        background: #34495e;
+        padding: 8px 16px;
+        border-radius: 5px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Container for additional game details */
+    .scoreboard-details {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    /* Styling for the detail items */
+    #downInfo,
+    #yardLine,
+    #currentQuarter,
+    #gameState {
+        background: #2c3e50;
+        padding: 8px 12px;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    /* Distinct styling for game state */
+    #gameState {
+        background: #e74c3c;
+    }
+    .game-state {
+      padding: 5px 10px;
+      transition: color 0.3s ease;
+    }
+    .game-state.play-off { color: #fff; }
+    .game-state.play-on { color: #0f0; }
+    .game-state.touchdown-team1 { color: #00f; }
+    .game-state.touchdown-team2 { color: #ffa500; }
+    .game-state.touchdown-flash {
+      animation: flash 0.5s alternate infinite; /* Flash effect */
+    }
+    @keyframes flash {
+      from { opacity: 1; }
+      to { opacity: 0.5; }
+    }
+    #messageDisplay {
+      position: absolute;
+      top: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 20px;
+      border-radius: 5px;
+      display: none;
+      font-weight: bold;
+      z-index: 1000;
+      font-size: 16px;
+      color: #000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    #overlayCanvas {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        height: 80%;
+        z-index: 10;
+        display: none;
+        pointer-events: none;
+        background-color: rgba(0, 0, 0, 0.5); /* 50% opaque black */
+        }
+
+ 
+    /* ====================Start screen container=============== */
+    .start-screen {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        border-top: 1px solid #00ffff;
+        transform: translate(-50%, -50%);
+        z-index: 20;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 40px;
+        text-align: center;
+        border-radius: 10px;
+        color: #fff;
+        }
+
+    .start-screen h1 {
+        margin: 0 0 20px;
+        font-size: 48px;
+    }
+
+    .start-screen button {
+        font-size: 24px;
+        padding: 10px 20px;
+        cursor: pointer;
+    }
+
+/* =============PLAY SELECTOR OVERLAY STYLES ================= */
+/* Shared overlay styles */
+#splashScreen, #playOverlay, #settingsOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.20) 0%, rgba(0, 20, 40, 0.40) 100%);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: flicker 4s infinite;
+        }
+        #splashScreen {
+            display: flex;
+        }
+        #splashContent, #playSelector, #settingsScreen {
+            background: linear-gradient(45deg, #0a0a0a, #1a1a2e);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            border: 3px solid #00ffff;
+            box-shadow: 0 0 20px #00ffff, 0 0 40px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(0, 255, 255, 0.7);
+            max-width: 450px;
+            width: 90%;
+            position: relative;
+            overflow: hidden;
+            cursor: move;
+        }
+        #splashContent::before, #playSelector::before, #settingsScreen::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 2px,
+                rgba(0, 255, 255, 0.05) 2px,
+                rgba(0, 255, 255, 0.05) 4px
+            );
+            pointer-events: none;
+            animation: scanline 6s linear infinite;
+        }
+        #splashContent h1, #playSelector h2, #settingsScreen h2 {
+            margin-top: 0;
+            color: #00ffff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            text-shadow: 0 0 8px #00ffff, 0 0 16px rgba(0, 255, 255, 0.8);
+            letter-spacing: 3px;
+        }
+        #playSelector label, #settingsScreen label {
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            text-shadow: 0 0 5px #00ffff, 0 0 10px rgba(0, 255, 255, 0.6);
+            display: block;
+            margin: 10px 0 5px;
+        }
+        #playSelector select, #settingsScreen input[type="number"] {
+            margin: 15px 0;
+            padding: 10px;
+            font-size: 18px;
+            background: #0f1a2a;
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            border-radius: 6px;
+            width: 85%;
+            box-shadow: 0 0 10px #00ffff, inset 0 0 5px rgba(0, 255, 255, 0.4);
+            font-family: 'Orbitron', sans-serif;
+        }
+        #playSelector select {
+            appearance: none;
+            background-image: linear-gradient(45deg, transparent 50%, #00ffff 50%),
+                             linear-gradient(135deg, #00ffff 50%, transparent 50%);
+            background-position: calc(100% - 20px) center, calc(100% - 15px) center;
+            background-size: 5px 5px, 5px 5px;
+            background-repeat: no-repeat;
+        }
+        #playSelector select option {
+            background: #0f1a2a;
+            color: #00ffff;
+        }
+        #settingsScreen input[type="checkbox"] {
+            margin: 10px 5px 10px 0;
+            transform: scale(1.5); /* Larger checkbox */
+        }
+        #splashContent button, #playSelector button, #settingsScreen button {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: linear-gradient(90deg, #00cccc, #00ffff);
+            color: #fff;
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            box-shadow: 0 0 15px #00ffff, 0 0 25px rgba(0, 255, 255, 0.6);
+            transition: all 0.3s ease;
+        }
+        #splashContent button:hover, #playSelector button:hover, #settingsScreen button:hover {
+            background: linear-gradient(90deg, #00ffff, #33ffff);
+            box-shadow: 0 0 25px #00ffff, 0 0 40px rgba(0, 255, 255, 0.8), inset 0 0 10px #fff;
+            transform: scale(1.05);
+        }
+        @keyframes flicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+            20%, 24%, 55% { opacity: 0.95; }
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+        /* Timer Overlay */
+        #timerOverlay {
+            position: absolute;
+            top: 5%;
+            left: 70%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 24px;
+            color: #fff;
+            display: none;
+            z-index: 1100;
+            font-family: sans-serif;
+        }
+        /*     Debug canvas styles   */
+        #debugCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200px;
+            height: 300px;
+            font-family: monospace;
+            font-size: 10px;
+            pointer-events: none; /* Allow interaction with underlying elements */
+            z-index: 1000;        /* Ensure the debug overlay is on top */
+            background: rgba(0, 0, 0, 0.5); /* 50% opaque black */
+            opacity: 0.5; /* 50% opacity */
+        }
+        /* Help Overlay */
+#helpOverlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.8);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#helpScreen {
+  background: #111;
+  color: #0ff;
+  padding: 20px 30px;
+  border: 2px solid #0ff;
+  border-radius: 8px;
+  max-width: 400px;
+  font-family: 'Orbitron', sans-serif;
+  text-shadow: 0 0 5px #0ff;
+}
+
+#helpScreen h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+#helpScreen ul {
+  list-style: none;
+  padding: 0;
+}
+
+#helpScreen li {
+  margin: 8px 0;
+}
+
+#closeHelpButton {
+  display: block;
+  margin: 15px auto 0;
+  padding: 8px 16px;
+  background: #0ff;
+  color: #111;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#closeHelpButton:hover {
+  background: #5ff;
+}
+
+  </style>
+</head>
+<body>
+
+
+    <script src="plays/playsBasic.js"></script>
+    <canvas id="gameCanvas" width="1440" height="750"></canvas>
+    <canvas id="overlayCanvas" width="1440" height="750"></canvas>
+    <canvas id="debugCanvas" style="display: none;" ></canvas>
+    <!-- Timer Overlay -->
+    <div id="timerOverlay">
+        <span id="timerDisplay">00:00</span>
+    </div>
+    <!-- Splash Screen -->
+    <div id="splashScreen">
+        <div id="splashContent">
+            <h1>ElectriK Football - Beta</h1>
+
+            <button id="gameStartButton">Game Start</button>
+            <p>UPDATE 2.2 4/17/25</p>
+            <p>PASSING and KICKING ADDED!</p>
+            <p>start play. stop when ready to pass. click [p] key to see receivers. select receiver</p>
+            <p>pull back on QB to pass</p>
+            <p>add drag/drop players no Shift Key</p>
+            <p>left click moveplayer, left click rotate mouse wheel, right click turn dial</p>
+            <p>>>KNOWN ISSUE - 4th down bug doesnt turn over ball. sometimes teams get swapped on TD at end of Qtr</p>
+            <p>HAL 9001 Entertainment</p>
+            
+        </div>
+    </div>
+
+    <!-- Play Selector Overlay -->
+    <div id="playOverlay">
+        <div id="playSelector">
+            <h2>Select Plays</h2>
+            <div>
+                <label for="offensePlay">Offense Play:</label>
+                <select id="offensePlay"></select> <!-- Options will be added dynamically -->
+            </div>
+            <div>
+                <label for="defensePlay">Defense Play:</label>
+                <select id="defensePlay"></select> <!-- Options will be added dynamically -->
+            </div>
+            <button id="submitPlaysButton">Select Play</button>
+        </div>
+    </div>
+
+
+    <div id="settingsOverlay">
+        <div id="settingsScreen">
+            <h2>Game Settings</h2>
+                <div><label for="flipxToggle">Flip X (Swap Sides):</label><input type="checkbox" id="flipxToggle"></div>
+                <div><label for="isRightTeamToggle">Swap Teams Direction (isRightTeam):</label><input type="checkbox" id="isRightTeamToggle" checked></div>
+                <div><label for="isTeam1OffenseToggle">Swap Ball Possession:</label><input type="checkbox" id="isTeam1OffenseToggle" checked></div>
+                <div><label for="gameclockInput">Game Clock (seconds):</label><input type="number" id="gameclockInput" value="900" min="0" step="1"></div>
+                <div><label for="downInput">Down:</label><input type="number" id="downInput" value="1" min="1" max="4" step="1"></div>
+                <div><label for="losInput">Line of Scrimmage :</label><input type="number" id="losInput" value="" min="0" max="1440" step="1"></div>
+                <div><label for="firstdownlineInput">First Down Line :</label><input type="number" id="firstdownlineInput" value="1" min="0" max="1440" step="1"></div>
+                <div><label for="scoringBoundaryToggle">Scoring Boundary (Right):</label><input type="checkbox" id="scoringBoundaryToggle" checked></div>
+                <button id="closeSettingsButton">Close</button>
+        </div>
+    </div>
+
+
+  <div id="startScreen" class="start-screen">
+    <h1>GAME SETUP</h1>
+    <p>Use the SPACEBAR to Start/Stop play</p>
+    <p>When a player is tackled game is stopped, use (r) key to reset and Select a Play</p>
+    <p>left Click - move player, left click rotate (mouse wheel), right click - turn dial</p>
+    <label for="qtrLengthInput">Quarter Length (seconds):</label>
+    <input type="number" id="qtrLengthInput" value="180" min="30" style="font-size: 24px; width: 80px; text-align: center;" />
+    <br /><br />
+    <button id="startGameBtn">Start Game</button>
+  </div>
+
+  <div id="scoreboard" class="control-group">
+    <div class="scoreboard-container">
+      <span class="team-score team1-score">Washington: <span id="team1Score">0</span></span>
+      <span id="gameClock">03:00</span>
+      <span class="team-score team2-score">Dallas: <span id="team2Score">0</span></span>
+    </div>
+    <div class="scoreboard-details">
+      <span id="downInfo">Down: <span id="downNum">1</span>&<span id="yardsNum">10</span></span>
+      <span id="yardLine">Yard Line: <span id="yardNum">-</span></span>
+      <span id="currentQuarter">Qtr <span id="currentQuarterDisplay"></span></span>
+      <span id="gameState" class="game-state play-off">Play Off</span>
+    </div>
+  </div>
+
+  <div id="messageDisplay">You Must Reset Formation first (r)</div>
+
+  
+  <div class="controls">
+    <div class="control-group"><button id="startGameBtn">Start Game</button></div>
+    <div class="control-group"><label for="gameSwitch">Play Mode (Game On):</label><input type="checkbox" id="gameSwitch"></div>
+    <div class="control-group"><button id="resetFormation">Reset Formation</button></div>
+    <div class="control-group"><label for="formationMode">Formation Mode (Drag Players):</label><input type="checkbox" id="formationMode"></div>
+    <div class="control-group"><label for="gameSpeedControl">Game Speed:</label><input type="range" id="gameSpeedControl" min="1" max="10" value="3"></div>
+    <div class="control-group"><label for="globalBaseControl">Global Base Direction (°):</label><input type="range" id="globalBaseControl" min="0" max="360" value="0"></div>
+
+
+    <p><strong>Right-click and drag</strong> on a player’s dial to adjust steering.</p>
+  </div>
+  
+<!-- Help Screen Overlay -->
+<div id="helpOverlay">
+    <div id="helpScreen">
+      <h2>How to Play</h2>
+      <ul>
+        <li><strong>Space</strong>: Start/stop play (disabled during kickoff)</li>
+        <li>Mouse Drag Band on ball carrier for Pass, Punts and Kickoffs</li>
+        <li><strong>R</strong>: Reset formation & select play</li>
+        <li><strong>----PASSING----</li>
+        <li>TO PASS - start play [space]</li>
+        <li>stop play , press [p], select receiver</li>
+        <li>pull ball on QB to pass</li>
+        <li><strong>F</strong>: Fair catch on punts</li>
+        <li><strong>Drag & Right‑click</strong>: Move & rotate players</li>
+        <li>USE Mouse-Wheel to rotate players</li>
+        <li>USE Right Mouse to turn base dial</li>
+        <li><strong>M</strong>: Open manual settings</li>
+        <li><strong>H</strong>: Toggle this Help screen</li>
+      </ul>
+      <button id="closeHelpButton">Close</button>
+    </div>
+  </div>
+  
+
+  <script>
+    window.onload = function() {
+        let gameStarted = false;
+        // ===================================================MANUAL SETTING SCREEN 
+        // 1) Grab your settings panel element immediately
+        const settingsOverlay = document.getElementById("settingsOverlay");
+        const settingsScreen  = document.getElementById("settingsScreen");
+
+        // Your existing globals, helper functions, showSettingsScreen(), hideSettingsScreen(), etc.
+
+        // 2) Bind the “M” key and Save/Close button
+        document.addEventListener("keydown", e => {
+            if (e.key.toLowerCase() === "m") showSettingsScreen();
+        });
+        document.getElementById("closeSettingsButton").addEventListener("click", () => {
+            applySettings();
+            hideSettingsScreen();
+        });
+
+        // 3) Now that settingsScreen is defined, wire up dragging
+        let isDraggingSettings    = false;
+        let settingsDragOffsetX   = 0;
+        let settingsDragOffsetY   = 0;
+
+        settingsScreen.addEventListener("mousedown", e => {
+            if (["INPUT","BUTTON","LABEL"].includes(e.target.tagName)) return;
+            isDraggingSettings   = true;
+            const rect           = settingsScreen.getBoundingClientRect();
+            settingsDragOffsetX  = e.clientX - rect.left;
+            settingsDragOffsetY  = e.clientY - rect.top;
+            settingsScreen.style.position = "absolute";
+            settingsScreen.style.cursor   = "grabbing";
+        });
+
+        document.addEventListener("mousemove", e => {
+            if (!isDraggingSettings) return;
+            e.preventDefault();
+            settingsScreen.style.left = (e.clientX - settingsDragOffsetX) + "px";
+            settingsScreen.style.top  = (e.clientY - settingsDragOffsetY) + "px";
+        });
+
+        document.addEventListener("mouseup", () => {
+            if (isDraggingSettings) {
+            isDraggingSettings       = false;
+            settingsScreen.style.cursor = "move";
+            }
+        });
+        // ===================================================END MANUAL SETTING SCREEN
+
+        // ===================================================HELP SCREEN
+        const helpOverlay     = document.getElementById("helpOverlay");
+        const closeHelpButton = document.getElementById("closeHelpButton");
+
+        // Show help: pause clock and display overlay
+        function showHelpScreen() {
+            stopGameClock();
+            helpOverlay.style.display = "flex";
+        }
+
+        function hideHelpScreen() {
+            helpOverlay.style.display = 'none';
+
+            // Only resume the clock if the game has started AND
+            // play‑mode is still on (gameSwitch.checked)
+            if (gameStarted && gameSwitch.checked) {
+                startQuarterClock();
+            }
+        }
+
+        // Keybinding: toggle on “H”
+        document.addEventListener("keydown", e => {
+        if (e.key.toLowerCase() === "h") {
+            if (helpOverlay.style.display === "flex") hideHelpScreen();
+            else showHelpScreen();
+        }
+        });
+
+        // Close button
+        closeHelpButton.addEventListener("click", hideHelpScreen);
+
+        // Prevent gameplay while help is up
+        helpOverlay.addEventListener("click", e => {
+        if (e.target === helpOverlay) hideHelpScreen();
+        });
+        // ===================================================END HELP SCREEN
+
+
+        let version = "25.04.15 2.0 ";
+        let developer = "HAL 9001 Entertainment";
+        console.log('ElectriK Football v' + version);
+        console.log('Window loaded, initializing game');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const gameSwitch = document.getElementById('gameSwitch');
+        const formationModeCheckbox = document.getElementById('formationMode');
+        const globalBaseControl = document.getElementById('globalBaseControl');
+        const gameSpeedControl = document.getElementById('gameSpeedControl');
+        const resetFormationBtn = document.getElementById('resetFormation');
+
+        // =========================================TEAMS SETUP
+        // == Setup team vaiables and colors 
+        // == in createPLayers function
+        // ====================================================
+
+        // ========================TEAM 1 VARIABLES
+        const team1Name = "Washington";
+        const team1BaseColor = "#f00"; // Red
+        const team1DialColor = "rgba(255, 0, 0, 0.8)"; // Red with opacity
+        const team1EndZoneColor = "#7A0019"; // Yellow end zone
+        // ========================TEAM 2 VARIABLES
+        const team2Name = "Dallas";
+        const team2BaseColor = "#0051ba"; // Blue
+        const team2DialColor = "rgba(0, 81, 186, 0.8)"; // Blue with opacity
+        const team2EndZoneColor = "#041E42"; // White end zone
+
+
+        const field = {leftEnd: 0, rightEnd: 100,center: 50,};
+
+        // ===field direction and player direction
+        let teamDirection = 1; 
+        let isTeam1Offense = true; // Team1 or Washington starts as offense
+        let flipx = 1;
+        let isRightTeam = true;
+        let rightTeam = 1;
+        let flip = (isTeam1Offense && isRightTeam) ? 1 : -1;
+        let scoringBoundary;
+        let ballCarrier = null;
+
+        //
+        let yardsToPixels = canvas.width / 120; // or a specific value like 12 if canvas.width is fixed
+        let lineOfScrimmageX = 30 * yardsToPixels; // Tracks the x-position of the line of scrimmage
+        let down = 1;              // Current down (1-4)
+        let yardsToFirst = 10;     // Yards needed for first down
+        let firstDownLine = null;  // X-position of the first-down marker
+        let startingLOS = null;    // Starting line of scrimmage for the drive
+        let yardCalc = 12;        // Yard calculation factor (120 pixels per 10 yard)
+        let currentQuarter = 1;
+        let quarterDuration = 10; // Quarter Durations seconds (adjust as needed)
+        let quarterTimeRemaining = quarterDuration;
+        let playActive = false; // Set to true when a play is in progress
+        let quarterClockInterval;
+
+        let touchdown1 = 10 * yardsToPixels;
+        let touchdown2 = 110 * yardsToPixels;
+        let touchdownX = [];
+
+        let baseSpeed = 0.5 * parseFloat(gameSpeedControl.value);
+        const maxTurnRate = 0.02;
+        let prevGlobalBase = degToRad(parseInt(globalBaseControl.value));
+        const formationLabels = ["QB", "C", "LG", "RG", "LT", "RT", "TE", "RB", "WR1", "WR2", "FB"];
+        let team1Score = 0;
+        let team2Score = 0;
+        let gameState = document.getElementById('gameState');
+        let isPlaying = false;
+        let gameSwitchTog = 1;
+        let disableTackles = false; // true lets play continue after touchwdown for a sec without tackle happening
+        
+        // ** Mouse setup to track mouse and shift key
+        let dialAdjustingPlayer = null;
+        let dialTrigger = 0; // trigger in the right click for player dials
+        let currentMouseX = 0, currentMouseY = 0;
+        let shiftDown = false;
+
+        // == dragging the band variables in the mousedown events
+        let bandActive   = false;      // are we currently dragging?
+        let bandType     = null;       // 'pass' or 'punt' or 'kickoff'
+        let bandStart    = null;       // { x, y }
+        let bandCurrent  = null;       // { x, y }
+
+
+        let playState = "normal"; // Options: "normal", "pass", "punt", "kickoff", "fg"
+
+        // == PASSINg VARIABLES
+        let passMode = false;
+        let selectedReceiver = null;
+        let dragging = false;
+        let dragStart = null;
+        let dragCurrent = null;
+        let ball = null;
+
+        // == KICKING VARIABLES
+        let isKicking = false;
+        let kickType = null; // "punt", "fg", "kickoff"
+        let kickStart = null;
+        let kickEnd = null;
+        let ballTrail = [];
+        const maxTrailLength = 30;
+        let isDraggingKick = false;
+        let kickDragStart = null;
+        let kickDragEnd = null;
+        let pendingKick = null; // store delayed kick params
+        const MAX_PUNT_YARDS = 75;
+        const MAX_PUNT_PIXELS = MAX_PUNT_YARDS * yardsToPixels; // = 900
+        let fairCatchCalled = false;
+        let receivingTeam;
+
+        // =========================================DEFINE PENALTIES 
+        // ** uses applyPenalty function to apply penalty to the game
+        //
+        const penalties = {
+        delayOfGame:      { label: 'Delay of Game',      yards:  5, advanceDown: false  },
+        passInterference: { label: 'Pass Interference',   yards: 15, advanceDown: true  },
+        offside:          { label: 'Offside',             yards:  5, advanceDown: false }, 
+        // …etc…
+        };
+
+
+
+        
+        // =========================================DEBUG CANVAS
+        // Create or adjust the debug overlay canvas.
+        // ====================================================
+        document.addEventListener("keydown", (event) => {
+        if (event.shiftKey && event.key.toLowerCase() === "d") {
+            const debugCanvas = document.getElementById("debugCanvas");
+            if (debugCanvas) {
+            // Toggle between "none" and "block"
+            debugCanvas.style.display = (debugCanvas.style.display === "none" || debugCanvas.style.display === "") 
+                                        ? "block" 
+                                        : "none";
+            }
+        }
+        });
+
+        function createDebugCanvas() {
+            let canvas = document.getElementById('debugCanvas');
+            if (!canvas) {
+                canvas = document.createElement('canvas');
+                canvas.id = 'debugCanvas';
+                document.body.appendChild(canvas);
+            }
+            // Adjust the canvas size to cover the whole viewport.
+            canvas.width = 200;
+            canvas.height = 200;
+            return canvas;
+            }
+
+            const debugCanvas = createDebugCanvas();
+            const debugCtx = debugCanvas.getContext('2d');
+
+            // Example function to update the debug overlay.
+            // Pass an object where keys are variable names and values are their current values.
+            function updateDebugOverlay(variables) {
+            // Clear the canvas.
+            debugCtx.clearRect(0, 0, debugCanvas.width, debugCanvas.height);
+            
+            // Set text styles.
+            debugCtx.font = '16px monospace';
+            debugCtx.fillStyle = 'white';
+            //debugCtx.fillText('isTeam1Offense: ' + isTeam1Offense, 10, 20);
+            
+            // Loop over the variables and display them.
+            let y = 20;
+            for (const [key, value] of Object.entries(variables)) {
+                debugCtx.fillText(`${key}: ${value}`, 10, y);
+                y += 20;
+            }
+        }
+        // =========================================END DEBUG CANVAS
+
+        // =========================================MULTIFUNCTION TIMER
+        class OverlayTimer {
+            constructor(displayId = "timerDisplay", containerId = "timerOverlay") {
+                this.display = document.getElementById(displayId);
+                this.container = document.getElementById(containerId);
+                this.duration = 0;
+                this.remaining = 0;
+                this.interval = null;
+                this.onExpire = () => {};
+            }
+
+            // durationSec: seconds to count down
+            // callback: fn to run when it hits zero
+            start(durationSec, callback) {
+                clearInterval(this.interval);
+                this.duration = durationSec;
+                this.remaining = durationSec;
+                this.onExpire = callback || (() => {});
+                this._updateDisplay();
+                this.container.style.display = "block";
+
+                this.interval = setInterval(() => {
+                this.remaining--;
+                if (this.remaining <= 0) {
+                    this.stop();
+                    this.onExpire();
+                } else {
+                    this._updateDisplay();
+                }
+                }, 1000);
+            }
+
+            pause() {
+                clearInterval(this.interval);
+            }
+
+            resume() {
+                if (this.remaining > 0 && !this.interval) {
+                this.start(this.remaining, this.onExpire);
+                }
+            }
+
+            stop() {
+                clearInterval(this.interval);
+                this.interval = null;
+                this.container.style.display = "none";
+            }
+
+            reset() {
+                this.stop();
+                this.remaining = this.duration;
+                this._updateDisplay();
+            }
+
+            _updateDisplay() {
+                const m = Math.floor(this.remaining / 60);
+                const s = this.remaining % 60;
+                this.display.textContent =
+                (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+            }
+            }
+
+            // make one global instance you can reuse anywhere
+            const overlayTimer = new OverlayTimer();
+        // =========================================MULTIFUNCTION TIMER END
+
+        // =========================================TRACKING MOUSE and SHIFT KEY
+        // Update mouse position globally
+        canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        currentMouseX = e.clientX - rect.left;
+        currentMouseY = e.clientY - rect.top;
+        });
+
+        // Update shift key state
+        document.addEventListener("keydown", (e) => {
+        if (e.key === "Shift") shiftDown = true;
+        });
+        document.addEventListener("keyup", (e) => {
+        if (e.key === "Shift") shiftDown = false;
+        });
+
+
+        // =========================================MANUAL SETTING OVERIDE
+        // ** CHange game variables hit the (m) key
+        // ===============================================================
+
+        function applySettings() {
+            // Read back in all fields:
+            flipx           = document.getElementById("flipxToggle").checked ? 1 : -1;
+            isRightTeam     = document.getElementById("isRightTeamToggle").checked;
+            isTeam1Offense  = document.getElementById("isTeam1OffenseToggle").checked;
+            quarterTimeRemaining = parseInt(document.getElementById("gameclockInput").value, 10) || quarterDuration;
+            down            = parseInt(document.getElementById("downInput").value, 10) || 1;
+            lineOfScrimmageX = parseInt(document.getElementById("losInput").value, 10) || lineOfScrimmageX;
+            firstDownLine   = parseInt(document.getElementById("firstdownlineInput").value, 10) || firstDownLine;
+            scoringBoundary = document.getElementById("scoringBoundaryToggle").checked 
+                                ? canvas.width - 120 
+                                : 120;
+
+            // Recompute derived values:
+            yardsToFirst = Math.max(0, (firstDownLine - lineOfScrimmageX) / yardsToPixels);
+
+            // Update everything in the UI:
+            updateScores();
+            updateClockDisplay();
+            updateFormation();
+        }
+
+        function showSettingsScreen() {
+            stopGameClock();
+            overlayTimer.stop();
+
+            // Populate fields from current state
+            document.getElementById("flipxToggle").checked          = flipx === 1;
+            document.getElementById("isRightTeamToggle").checked    = isRightTeam;
+            document.getElementById("isTeam1OffenseToggle").checked = isTeam1Offense;
+            document.getElementById("gameclockInput").value         = quarterTimeRemaining;
+            document.getElementById("downInput").value              = down;
+            document.getElementById("losInput").value               = lineOfScrimmageX;
+            document.getElementById("firstdownlineInput").value     = firstDownLine;
+            document.getElementById("scoringBoundaryToggle").checked= (scoringBoundary === canvas.width - 120);
+
+            document.getElementById("settingsOverlay").style.display = "flex";
+        }
+
+        function hideSettingsScreen() {
+        document.getElementById("settingsOverlay").style.display = "none";
+        }
+
+
+        function showSettingsScreen2() {
+            const overlay = document.getElementById("settingsOverlay");
+            const screen = document.getElementById("settingsScreen");
+            stopGameClock();
+
+            // Set initial values from current game state
+            document.getElementById("flipxToggle").checked = flipx === 1;
+            document.getElementById("isRightTeamToggle").checked = isRightTeam;
+            document.getElementById("isTeam1OffenseToggle").checked = isTeam1Offense;
+            document.getElementById("gameclockInput").value = quarterTimeRemaining;
+            document.getElementById("downInput").value = down;
+            document.getElementById("losInput").value = lineOfScrimmageX;
+            document.getElementById("firstdownlineInput").value = firstDownLine;
+            document.getElementById("scoringBoundaryToggle").checked = scoringBoundary === canvas.width - 120;
+
+
+            // Add event listeners for real-time updates
+            document.getElementById("flipxToggle").addEventListener("change", updateSettings);
+            document.getElementById("isRightTeamToggle").addEventListener("change", updateSettings);
+            document.getElementById("isTeam1OffenseToggle").addEventListener("change", updateSettings);
+            document.getElementById("gameclockInput").addEventListener("input", updateSettings);
+            document.getElementById("downInput").addEventListener("input", updateSettings);
+            document.getElementById("losInput").addEventListener("input", updateSettings);
+            document.getElementById("firstdownlineInput").addEventListener("input", updateSettings);
+            document.getElementById("scoringBoundaryToggle").addEventListener("change", updateSettings);
+
+            overlay.style.display = "flex";
+
+            // Dragging logic for settings screen
+            let isDragging = false;
+            let currentX;
+            let currentY;
+
+            screen.addEventListener("mousedown", startDragging);
+            document.addEventListener("mousemove", drag);
+            document.addEventListener("mouseup", stopDragging);
+
+            function startDragging(e) {
+                if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON") return;
+                isDragging = true;
+                const rect = screen.getBoundingClientRect();
+                currentX = e.clientX - rect.left;
+                currentY = e.clientY - rect.top;
+                screen.style.cursor = "grabbing";
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.clientX - currentX;
+                const y = e.clientY - currentY;
+                const maxX = canvas.width - screen.offsetWidth;
+                const maxY = canvas.height - screen.offsetHeight;
+                screen.style.left = Math.max(0, Math.min(x, maxX)) + "px";
+                screen.style.top = Math.max(0, Math.min(y, maxY)) + "px";
+                screen.style.position = "absolute";
+            }
+
+            function stopDragging() {
+                isDragging = false;
+                screen.style.cursor = "move";
+            }
+        }
+
+        function hideSettingsScreen() {
+            document.getElementById("settingsOverlay").style.display = "none";
+        }
+
+        function updateSettings() {
+            yardsToFirst = parseInt(document.getElementById("firstdownlineInput").value) - parseInt(document.getElementById("losInput").value) ;
+            yardsToFirst = Math.max(0, yardsToFirst)/yardsToPixels; // Ensure it's not negative5
+            flipx = document.getElementById("flipxToggle").checked ? 1 : -1;
+            isRightTeam = document.getElementById("isRightTeamToggle").checked;
+            isTeam1Offense = document.getElementById("isTeam1OffenseToggle").checked;
+            quarterTimeRemaining = parseInt(document.getElementById("gameclockInput").value) || 900;
+            down = parseInt(document.getElementById("downInput").value) || 1;
+            lineOfScrimmageX = parseInt(document.getElementById("losInput").value)|| 360;
+            firstDownLine = parseInt(document.getElementById("firstdownlineInput").value)|| 460;
+            scoringBoundary = document.getElementById("scoringBoundaryToggle").checked ? canvas.width - 120 : 120;
+
+            // Update formation with new settings
+            updateScores();
+            updateFormation();
+        }
+
+        document.getElementById("closeSettingsButton").addEventListener("click", hideSettingsScreen);
+        document.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "m") {
+                showSettingsScreen();
+            }
+        });
+
+
+        // =========================================END MANUAL SETTING OVERIDE
+
+        // =========================================SPLASH SCREEN
+        showSplashScreen();
+        function showSplashScreen() {
+            document.getElementById("splashScreen").style.display = "flex";
+        }
+
+        function hideSplashScreen() {
+            document.getElementById("splashScreen").style.display = "none";
+        }
+        function startGame() {
+            hideSplashScreen();
+              // if your <select> has a 'Kickoff' option:
+            kickoff();
+            //kickoff();    // ← this auto‑sets playState="kickoff", isKicking=true, etc.
+        }
+
+
+        document.getElementById("gameStartButton").addEventListener("click", startGame);
+        // =========================================END SPLASH SCREEN
+
+
+        // ====================================================GAME SOUND
+        // ** Handles all the game sound and fx
+        // ** 
+        // =======================================================
+        // == Preload audio files
+        const tdCrowd = new Audio('audio/ef-crowdCheer1.mp3');
+        const whistle1 = new Audio('audio/ef-whistle.mp3');
+        whistle1.volume =  1.0; // Set volume for whistle sound
+        // ====================================================GAME VIBRATING
+        // start vibrating when gameSwitch is ON using Tone.js Synth
+        // ====================================================
+        let audioCtx;
+        let noise;
+        let volume = 0.6;
+
+        function initializeAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('AudioContext initialized, state:', audioCtx.state);
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(() => console.log('AudioContext resumed'));
+                }
+            }
+        }
+
+        // Global variables (if not already declared)
+        let buzzOsc;
+        //let volume = 0.5; // Example volume
+
+        function startVibratingSound() {
+        // Start Tone.js if not already running (usually triggered by a user event)
+        Tone.start();
+
+        // Stop and clear any existing noise
+        if (noise) {
+            noise.stop();
+            noise = null;
+        }
+        // Stop and clear any existing oscillator
+        if (buzzOsc) {
+            buzzOsc.stop();
+            buzzOsc = null;
+        }
+
+        // Create a brown noise source and start it.
+        noise = new Tone.Noise("brown").start();
+
+        // Create a sawtooth oscillator for a buzzing sound.
+        buzzOsc = new Tone.Oscillator({
+            frequency: 300, // Adjust frequency as needed
+            type: "sawtooth"
+        }).start();
+
+        // Create a filter with LFO modulation
+        const filter = new Tone.Filter({
+            type: "lowpass",
+            frequency: 600,
+            Q: 5
+        });
+        
+        // Create a gain node using your volume variable.
+        const gain = new Tone.Gain(volume);
+
+        // Create an LFO to modulate the filter's cutoff frequency.
+        const lfo = new Tone.LFO({
+            frequency: 200,
+            min: 180,
+            max: 700
+        }).start();
+        lfo.connect(filter.frequency);
+
+        // Create a distortion node to add character.
+        const distortion = new Tone.Distortion(0.3);
+
+        // Connect both noise and oscillator to the distortion.
+        noise.connect(distortion);
+        buzzOsc.connect(distortion);
+
+        // Pass the combined signal through the filter and then to gain.
+        distortion.connect(filter);
+        filter.connect(gain);
+
+        // Route the final output to the audio destination.
+        gain.toDestination();
+
+        console.log('Rumbly electric football metal vibration started');
+        }
+
+
+        function stopVibratingSound() {
+            if (noise) {
+            noise.stop();
+            buzzOsc.stop();
+            noise = null;
+            buzzOsc = null;
+            console.log('Rumbly electric football metal vibration stopped');
+            }
+        }
+        // =========================================END GAME VIBRATING
+
+        // Create a named function so we can remove it later.
+        function startAudioOnAnyClick() {
+            startupAudio.play().catch(e => console.log("Playback failed:", e));
+            // Remove the event listener so it only triggers once.
+            document.removeEventListener("click", startAudioOnAnyClick);
+        }
+        document.addEventListener("click", startAudioOnAnyClick); // start startup audio on first click
+
+        //==================================================================GAME CLOCK
+        // Initial game time in seconds (3 minutes by default, adjustable)
+        let gameTime = 180;  
+        let gameClockInterval = null;
+
+        // Format time (in seconds) into mm:ss format.
+        function formatTime(seconds) {
+        let mins = Math.floor(seconds / 60);
+        let secs = seconds % 60;
+        return (mins < 10 ? "0" : "") + mins + ":" + (secs < 10 ? "0" : "") + secs;
+        }
+
+        // Update the clock display on screen.
+        function updateClockDisplay() {
+        // Update your on-screen clock (for example, in the scoreboard)
+        document.getElementById("gameClock").textContent = formatTime(quarterTimeRemaining);
+        }
+
+        function startQuarterClock() {
+        clearInterval(quarterClockInterval);
+        quarterClockInterval = setInterval(() => {
+            if (quarterTimeRemaining > 0) {
+            quarterTimeRemaining--;
+            updateClockDisplay(); // Updates the scoreboard clock
+            } else {
+            // If time is up, but a play is still running, wait until it ends.
+            if (!isPlaying) {
+                clearInterval(quarterClockInterval);
+                endQuarter();
+            }
+            }
+        }, 1000);
+        }  
+        function stopGameClock() {
+            clearInterval(quarterClockInterval);
+        }
+        function formatTime(seconds) {
+        let mins = Math.floor(seconds / 60);
+        let secs = seconds % 60;
+        return (mins < 10 ? "0" + mins : mins) + ":" + (secs < 10 ? "0" + secs : secs);
+        }
+
+        // =======================================================START UP SCREEN
+        // Start Game button event listener.
+        // ====================================================================
+        const startupAudio = new Audio('audio/PixelVictory.mp3');
+        startupAudio.loop = true; // Loop the audio for the duration of the startup screen
+        document.getElementById("startGameBtn").addEventListener("click", function() {
+            // Read the quarter length from the input and convert to seconds.
+            const qtrLengthInput = document.getElementById("qtrLengthInput").value;
+            quarterDuration = parseInt(qtrLengthInput, 10);
+            quarterTimeRemaining = quarterDuration;
+            document.getElementById("startScreen").style.display = "none";      // Hide the start screen.
+            document.getElementById("overlayCanvas").style.display = "none";    // Optionally, hide overlay canvas if you're not using it now:
+            gameStarted = true; // Set gameStarted flag to true.
+            startupAudio.pause();
+            startupAudio.currentTime = 0; // Optional: reset playback position if you want to restart it later.
+            updateClockDisplay(); // Update the clock display on the scoreboard.
+            // At this point, the game becomes active.
+            // (You can now allow play to start or allow other input.)
+            console.log("Game activated; clock remains off until triggered separately.");
+        });
+
+        // ======================================================OVERLAY CANVAS
+        // To show messages during game , halftime etc
+        // ====================================================================
+        function showOverlay(message) {
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        const overlayCtx = overlayCanvas.getContext('2d');
+
+        // Make the overlay visible.
+        overlayCanvas.style.display = 'block';
+
+        // Clear any previous drawings.
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        // Draw a semi-transparent background.
+        overlayCtx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        overlayCtx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        // Draw the message in the center.
+        overlayCtx.fillStyle = "white";
+        overlayCtx.font = "48px Arial";
+        overlayCtx.textAlign = "center";
+        overlayCtx.textBaseline = "middle";
+        overlayCtx.fillText(message, overlayCanvas.width / 2, overlayCanvas.height / 2);
+        }
+        // ==== Hide the Overlay
+        function hideOverlay() {
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        overlayCanvas.style.display = 'none';
+        }
+
+        // ==== SHOW A MESSAGE ON SCREEN
+        function showMessage(msg, duration = 2000) {
+            const messageDisplay = document.getElementById("messageDisplay");
+            messageDisplay.textContent = msg;
+            messageDisplay.style.display = "block";
+            setTimeout(() => {
+                messageDisplay.style.display = "none";
+            }, duration);
+        }
+
+
+        // ===================================================KEY LISTENERS
+
+        // ===================================================THE ULTIMATE GAME SWITCH
+        // ** PRESS the spacebar to start and stop play
+        // ** the clock withh start and stop each time pressed
+        // ==========================================================================
+
+        document.addEventListener("keydown", function(e) {
+            if (e.code === "Space") {
+                e.preventDefault(); // Prevent default scrolling behavior
+
+                    // ←— ADD THIS:
+                if (playState === "kickoff") {
+                    showMessage("Cannot start play during kickoff - Pull ball back on kicker", 2500);
+                return;
+                }
+                // If the game hasn't started, show a message.
+                if (!gameStarted) {
+                const messageDisplay = document.getElementById("messageDisplay");
+                if (messageDisplay) {
+                    messageDisplay.textContent = "Press Start Game first!";
+                    messageDisplay.style.display = "block";
+                    setTimeout(() => {
+                    messageDisplay.style.display = "none";
+                    }, 2000);
+                }
+                return;
+                }
+
+                // If play is already on, allow toggling it off.
+                if (gameSwitch.checked) {
+                    gameSwitch.checked = false;
+                    gameSwitch.dispatchEvent(new Event("change"));
+                    console.log("Play mode toggled off via spacebar");
+                } else {
+                // If play is off, only allow starting play if formation is reset.
+                    if (gameSwitchTog === 1) {
+                        gameSwitch.checked = true;
+                        gameSwitch.dispatchEvent(new Event("change"));
+                        console.log("Play mode toggled on via spacebar");
+                    } else {
+                        // Show message if formation hasn't been reset.
+                        const messageDisplay = document.getElementById("messageDisplay");
+                        if (messageDisplay) {
+                        messageDisplay.textContent = "You Select a Play First (r)";
+                        messageDisplay.style.display = "block";
+                        setTimeout(() => {
+                            messageDisplay.style.display = "none";
+                        }, 2000);
+                        }
+                    }
+                }
+            }
+
+            // ==Activate pass play and pass functions in update
+            // == START PASS HERE
+            //document.addEventListener("keydown", (e) => {
+                if (e.key.toLowerCase() === "p" && !gameSwitch.checked && gameStarted) {
+                    const QB = [...team1Players, ...team2Players].find(p => p.hasBall);
+                    if (!QB) return;
+
+                    // Only allow pass if QB is behind LOS
+                    if ((isTeam1Offense && QB.x * flipx < lineOfScrimmageX * flipx) ||
+                        (!isTeam1Offense && QB.x * flipx < lineOfScrimmageX * flipx)) {
+                    
+                    passMode = true;
+                    selectedReceiver = null;
+                    playState = "pass"; // Set play state to pass
+
+                    // Mark eligible receivers (offensive players excluding QB)
+                    const offense = isTeam1Offense ? team1Players : team2Players;
+                    offense.forEach(p => {
+                        p.selected = false;
+                        p.isEligible = p.label.startsWith("WR") || p.label === "RB" || p.label === "TE";
+                    });
+
+                    showMessage("Select a Receiver", 2000);
+                    } else {
+                    showMessage("QB must be behind line of scrimmage", 2000);
+                    }
+                }
+            //});
+            
+            // == FAIR CATCH DURING PUNT
+            document.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "f" && playState === "punt" && ball && ball.isKicked) {
+                fairCatchCalled = true;
+                showMessage("Fair Catch Called!");
+            }
+});
+
+
+
+
+        });
+
+
+        // =======================================================GAME SWITCH
+        // start/stop the game with spacebar
+        // ====================================================================
+        gameSwitch.addEventListener('change', function() {
+        if (this.checked) {
+            overlayTimer.stop(); // STOP OVERLAY TIMER
+            playActive = true; // Set playActive to true when game is on
+            startQuarterClock();
+            startVibratingSound();
+            team1Players.forEach(p => { p.vx = 0; p.vy = 0; });
+            team2Players.forEach(p => { p.vx = 0; p.vy = 0; });
+            if (down === 1 && startingLOS === null) {
+                startingLOS = 360; // Set to 20-yard line (120 + 20 * 12 = 360)
+                firstDownLine = isTeam1Offense ? startingLOS + 120 : startingLOS - 120;
+                console.log('First down set, starting LOS:', startingLOS, 'First down line:', firstDownLine);
+            }
+            gameState.textContent = "Play On";
+            gameState.className = "game-state play-on";
+            isPlaying = true;
+            console.log('=======>Game switch ON');
+        } else {
+            stopVibratingSound();
+            stopGameClock();
+            gameState.textContent = "Play Off";
+            gameState.className = "game-state play-off";
+            isPlaying = false;
+            console.log('========>Game switch OFF');
+        }
+        });
+
+        function gamestateoff() {
+            gameState.textContent = "Play Off";
+            gameState.className = "game-state play-off";
+            isPlaying = false;
+        }
+        canvas.addEventListener('click', function() {
+            initializeAudio();
+        }, { once: true });
+
+
+
+        // =================================================================== QUARTER MANAGEMENT
+        // *** end of Quarter procedures
+        // ====================================================================
+        function endQuarter() {
+            console.log("Quarter " + currentQuarter + " ended.");
+            overlayTimer.stop(); // Stop the overlay timer if it's running
+
+            if (currentQuarter === 1 || currentQuarter === 3) {
+                // Display overlay message for a quarter break.
+                showOverlay("Quarter" + currentQuarter + "End! Press 'R' to reset formation.");
+                
+                // Optionally, you can set a timeout to auto-hide the overlay after a few seconds:
+                setTimeout(() => {
+                    hideOverlay();
+                    proceedToNextQuarter();
+                }, 2000); // 5 seconds delay
+            } else {
+                proceedToNextQuarter();
+            }
+        }
+
+        function proceedToNextQuarter() {
+        console.log("Quarter " + currentQuarter + " ended.");
+        if (currentQuarter === 1) {
+            // After Q1, swap sides and have the team with the ball start on the opposite end.
+            swapFieldSides();
+            currentQuarter = 2;
+            quarterTimeRemaining = quarterDuration;
+            updateClockDisplay();
+            updateScores();
+        } else if (currentQuarter === 2) {
+            // =====================HALFTIME
+            showOverlay("Halftime - take a break!");    
+            setTimeout(() => {
+                hideOverlay();
+            }, 3000); // 5 seconds delay
+            //===================RESET PARAMETERS FOR 3RD QTR
+            currentQuarter = 3;
+            quarterTimeRemaining = quarterDuration;
+            lineOfScrimmageX = 90 * yardsToPixels; // Reset to the 20-yard line
+            isRightTeam = true;
+            isTeam1Offense = false;
+            kickoff();
+            //flip = (isTeam1Offense && isRightTeam) ? 1 : -1;
+            //teamDirection = teamDirection === 1 ? 0 : 1;
+            firstDownLine = 10 * yardsToPixels;
+            updateScores();
+            //resetFormation();
+            console.log("Halftime reset. Team1 offense:", isTeam1Offense);
+            //startQuarterClock();
+            // ======================3rd QTR
+        } else if (currentQuarter === 3) {
+            // End of Q3: swap sides again.
+            swapFieldSides();
+            currentQuarter = 4;
+            quarterTimeRemaining = quarterDuration;
+            // ======================4th Qtr
+        } else if (currentQuarter === 4) {
+            endGame();
+        } else if (currentQuarter === 0){
+            // Game over.
+            endGame();
+        }
+        }
+
+        // ==================================================== Start the game clock countdown.
+        function startGameClockx() {
+        // Clear any existing clock interval.
+        if (gameClockInterval) clearInterval(gameClockInterval);
+        gameClockInterval = setInterval(() => {
+            if (gameTime > 0) {
+            gameTime--;
+            updateGameClockDisplay();
+            } else {
+            clearInterval(gameClockInterval);
+            console.log("Game clock ended");
+            // Optionally, trigger end-of-game or next phase here.
+            }
+        }, 500);
+        // =======================================STOP GAME CLOCK
+        }
+
+
+        function swapFieldSides() {
+            // Toggle the direction variable: if 1 becomes 0, if 0 becomes 1.
+            teamDirection = teamDirection === 1 ? 0 : 1;
+            isRightTeam = !isRightTeam; // SWAP TEAM TO OPPOSITE END OF FIELD
+            flipx = -flipx; // REVERSE DIRECTION OF PLAY
+            // Mirror the current LOS using your helper function.
+            lineOfScrimmageX = newLOSForSwap();
+            // Rebuild formation with the updated teamDirection.
+            if (touchdownScored === true) {
+                kickoff();
+            } else {
+                resetFormation(lineOfScrimmageX);
+            }
+            
+            // Update the first down marker.
+            firstDownLine = isTeam1Offense
+                ? lineOfScrimmageX - (yardsToFirst * yardsToPixels)
+                : lineOfScrimmageX + (yardsToFirst * yardsToPixels);
+            
+            console.log("Field sides swapped. New LOS:", lineOfScrimmageX, "teamDirection:", teamDirection);
+        }
+
+        function newLOSForSwap() {
+        // Assume:
+        // - Left field boundary in pixels = 120
+        // - Right field boundary in pixels = canvas.width - 120
+        // - Total field yardage = 100 yards.
+        // - yardsToPixels is defined (for example, 12 pixels per yard)
+        // Convert current LOS (in pixels) to yards:
+        let currentLOSInYards = (lineOfScrimmageX - 120) / yardsToPixels;
+        // Mirror that relative to a 100-yard field:
+        let newLOSInYards = 100 - currentLOSInYards;
+        // Convert back to pixels:
+        return 120 + newLOSInYards * yardsToPixels;
+        }
+
+        function resetGameForHalftime() {
+        // ===============NOT USING RIGHT NOW
+        console.log("Halftime reset. Team1 offense:", isTeam1Offense);
+        }
+
+        function endGame() {
+            showOverlay("END of GAME");
+
+            console.log("Game over.");
+            // Display final score and handle any end-of-game logic here.
+        }
+        // Attach event listener to the start button.
+        document.getElementById("startGameBtn").addEventListener("click", function(e) {
+            // When Start Game is clicked, set the flag to true and start the game clock (if applicable)
+            gameStarted = true;
+            //startQuarterClock(); // Your function to start the clock or game loop.
+            console.log("Game started!");
+            
+            // Optionally, hide or disable the Start Game button so it can’t be pressed again.
+            this.disabled = true;
+        });
+
+        // =======================================================DRAW FIELD
+        function drawField() {
+
+        // =================CREATE FIELD WITH GRASS
+        ctx.save();
+        ctx.fillStyle = "#228B22";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // =================END ZONE 1
+        ctx.fillStyle = team1EndZoneColor;
+        ctx.fillRect(0, 0, 120, canvas.height);
+      
+
+        // =================END ZONE 2
+        ctx.fillStyle = team2EndZoneColor;
+        ctx.fillRect(canvas.width - 120, 0, 120, canvas.height);
+
+
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 1;
+        for (let yard = field.leftEnd + 10; yard <= field.rightEnd +5; yard += 5) {
+          const x = yard * yardsToPixels;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.strokeStyle = "white";
+          ctx.stroke();
+        }
+
+        // ===========================================DRAW TEAM NAMES TEAM 1
+        ctx.save();
+        // Move to the center of the left end zone
+        ctx.translate(60, canvas.height / 2);
+        // Rotate 90° counter-clockwise to draw text vertically
+        ctx.rotate(-Math.PI / 2);
+        // Set font, alignment, and color
+        ctx.font = "bold 70px VARSITY";
+        ctx.fillStyle = "#dddddd";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // First draw the outline
+        ctx.strokeStyle = "#FFB612";
+        ctx.lineWidth = 3;          // STROKE
+        ctx.strokeText("REDSKINS", 0, 0);
+        // Then fill the text
+        ctx.fillStyle = "#FFB612";  // FILL COLOR
+        ctx.fillText("REDSKINS", 0, 0);
+        ctx.restore();
+
+        // ===========================================DRAW TEAM 2 ENDZONE
+        // 6) Draw “COWBOYS” text in the right end zone
+        ctx.save();
+        // Move to the center of the right end zone
+        ctx.translate(canvas.width - 60, canvas.height / 2);
+        // Rotate 90° clockwise
+        ctx.rotate(Math.PI / 2);
+        ctx.font = "bold 70px ITC Machine";
+        ctx.fillStyle = "#dddddd";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        // First draw the outline
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 3;          // Thickness of the outline
+        ctx.strokeText("COWBOYS", 0, 0);
+        // Then fill the text
+        ctx.fillStyle = "#eeeeee";  // Cowboys navy (or another color)
+        ctx.fillText("COWBOYS", 0, 0);
+        ctx.restore();
+
+
+
+        // ==Draw Goal Lines
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(120, 0);
+        ctx.lineTo(120, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(1320, 0);
+        ctx.lineTo(1320, canvas.height);
+        ctx.stroke();
+
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("G", 138, canvas.height - 100);
+        ctx.fillText("G", 138, 100);
+        ctx.fillText("G", 1302, 100);
+        ctx.fillText("G", 1302, canvas.height - 100);
+
+        // =====================Draw Hash Marks
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 1;
+        for (let x = 10 * yardsToPixels; x <= 1320; x += 12) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 5);
+          ctx.moveTo(x, canvas.height - 5); // start 5 pixels above the bottom edge
+          ctx.lineTo(x, canvas.height);     // end at the bottom edge
+          ctx.moveTo(x, canvas.height/2-100); // start 5 pixels above the bottom edge
+          ctx.lineTo(x, canvas.height/2-95);     // end at the bottom edge
+          ctx.moveTo(x, canvas.height/2+100); // start 5 pixels above the bottom edge
+          ctx.lineTo(x, canvas.height/2+95);     // end at the bottom edge
+          ctx.stroke();
+        }
+
+        ctx.lineWidth = 1; //50
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, 0);
+        ctx.lineTo(canvas.width / 2, canvas.height);
+        ctx.stroke();
+
+        // ===DRAW YARD LINES TEXT
+        ctx.fillStyle = "white";
+        ctx.font = "24px Varsity Regular";
+        ctx.textAlign = "center";
+        for (let x = 10 * yardsToPixels; x <= 100 * yardsToPixels; x += 120) {
+          let yard = (x - 240) / 12;
+          let displayYard = yard <= 40 ? yard + 10 : 90 - yard;
+          if (displayYard !== 0) {
+            ctx.fillText(displayYard, x, 100);
+            ctx.fillText(displayYard, x, canvas.height - 100);
+          }
+        }
+
+        
+        // ===DRAW LINE OF SCRIMMAGE LOS
+        if (lineOfScrimmageX !== null) {
+          ctx.strokeStyle = "black";
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(lineOfScrimmageX, 0);
+          ctx.lineTo(lineOfScrimmageX, canvas.height);
+          ctx.stroke();
+        }
+        // Draw first-down line if set
+        if (firstDownLine !== null) {
+          ctx.strokeStyle = "yellow";
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(firstDownLine, 0);
+          ctx.lineTo(firstDownLine, canvas.height);
+          ctx.stroke();
+        }
+
+        // ======DRAW VERSION AND DEVELOPER INFO ON FIELD
+        ctx.font = "16px Orbitron"; // TRON-like font, adjust size as needed
+        ctx.fillStyle = "#00ffff"; // Cyan to match theme
+        ctx.textAlign = "right"; // Right-align text
+        ctx.fillText(`Version: ${version}`, canvas.width - 10, canvas.height - 30); // 10px from right, 30px from bottom
+        ctx.fillText(`Developer: ${developer}`, canvas.width - 10, canvas.height - 10); // 10px from right, 10px from bottom
+
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+      }
+
+        function degToRad(deg) {
+        return deg * (Math.PI / 180);
+        }
+
+        class SpatialGrid {
+        constructor(cellSize, canvasWidth, canvasHeight) {
+            this.cellSize = cellSize;
+            this.cols = Math.ceil(canvasWidth / cellSize);
+            this.rows = Math.ceil(canvasHeight / cellSize);
+            this.grid = Array(this.cols).fill().map(() => Array(this.rows).fill().map(() => []));
+        }
+        clear() {
+            for (let x = 0; x < this.cols; x++) {
+            for (let y = 0; y < this.rows; y++) {
+                this.grid[x][y].length = 0;
+            }
+            }
+        }
+        addPlayer(player) {
+            const minX = Math.floor((player.x - player.baseWidth / 2) / this.cellSize);
+            const maxX = Math.floor((player.x + player.baseWidth / 2) / this.cellSize);
+            const minY = Math.floor((player.y - player.baseHeight / 2) / this.cellSize);
+            const maxY = Math.floor((player.y + player.baseHeight / 2) / this.cellSize);
+            for (let x = Math.max(0, minX); x <= Math.min(this.cols - 1, maxX); x++) {
+            for (let y = Math.max(0, minY); y <= Math.min(this.rows - 1, maxY); y++) {
+                this.grid[x][y].push(player);
+            }
+            }
+        }
+        getNearbyPlayers(player) {
+            const minX = Math.floor((player.x - player.baseWidth / 2) / this.cellSize);
+            const maxX = Math.floor((player.x + player.baseWidth / 2) / this.cellSize);
+            const minY = Math.floor((player.y - player.baseHeight / 2) / this.cellSize);
+            const maxY = Math.floor((player.y + player.baseHeight / 2) / this.cellSize);
+            let nearby = new Set();
+            for (let x = Math.max(0, minX); x <= Math.min(this.cols - 1, maxX); x++) {
+            for (let y = Math.max(0, minY); y <= Math.min(this.rows - 1, maxY); y++) {
+                this.grid[x][y].forEach(p => nearby.add(p));
+            }
+            }
+            nearby.delete(player);
+            return Array.from(nearby);
+        }
+        }
+
+        // =======================================================START COLLISION DETECTION
+        const grid = new SpatialGrid(100, canvas.width, canvas.height);
+
+        function getRectangleVertices(player) {
+        const w = player.baseWidth;
+        const h = player.baseHeight;
+        const cx = player.x;
+        const cy = player.y;
+        const angle = player.heading;
+        const localCorners = [
+            { x: -w / 2, y: -h / 2 },
+            { x: w / 2, y: -h / 2 },
+            { x: w / 2, y: h / 2 },
+            { x: -w / 2, y: h / 2 }
+        ];
+        let vertices = [];
+        for (let corner of localCorners) {
+            const rx = corner.x * Math.cos(angle) - corner.y * Math.sin(angle);
+            const ry = corner.x * Math.sin(angle) + corner.y * Math.cos(angle);
+            vertices.push({ x: rx + cx, y: ry + cy });
+        }
+        return vertices;
+        }
+
+        function projectPolygon(axis, vertices) {
+        let min = Infinity, max = -Infinity;
+        for (let v of vertices) {
+            let dot = v.x * axis.x + v.y * axis.y;
+            if (dot < min) min = dot;
+            if (dot > max) max = dot;
+        }
+        return { min, max };
+        }
+
+        function polygonCollision(poly1, poly2) {
+        let overlap = Infinity;
+        let smallestAxis = null;
+        function testAxes(vertices) {
+            for (let i = 0; i < vertices.length; i++) {
+            let p1 = vertices[i];
+            let p2 = vertices[(i + 1) % vertices.length];
+            let edge = { x: p2.x - p1.x, y: p2.y - p1.y };
+            let axis = { x: -edge.y, y: edge.x };
+            let len = Math.sqrt(axis.x * axis.x + axis.y * axis.y);
+            axis.x /= len;
+            axis.y /= len;
+            let proj1 = projectPolygon(axis, poly1);
+            let proj2 = projectPolygon(axis, poly2);
+            let o = Math.min(proj1.max, proj2.max) - Math.max(proj1.min, proj2.min);
+            if (o < 0) return { colliding: false };
+            if (o < overlap) {
+                overlap = o;
+                smallestAxis = axis;
+            }
+            }
+            return { colliding: true };
+        }
+        let res1 = testAxes(poly1);
+        if (!res1.colliding) return null;
+        let res2 = testAxes(poly2);
+        if (!res2.colliding) return null;
+        return { overlap, axis: smallestAxis };
+        }
+
+        function adjustHeadingOnCollision(player, other, overlap) {
+        const dx = other.x - player.x;
+        const dy = other.y - player.y;
+        const mag = Math.sqrt(dx * dx + dy * dy);
+        if (mag === 0) return;
+        const contactNorm = { x: dx / mag, y: dy / mag };
+        const forward = { x: Math.cos(player.heading), y: Math.sin(player.heading) };
+        const dot = forward.x * contactNorm.x + forward.y * contactNorm.y;
+        const cross = forward.x * contactNorm.y - forward.y * contactNorm.x;
+        const turnFactor = 0.03;
+        const turnAmount = turnFactor * overlap * (dot < 0 ? (1 - dot) : 0.5 * (1 - dot));
+        player.heading += turnAmount * (cross > 0 ? 1 : -1);
+        }
+    
+        // =======================================================DETECT COLLISIONS
+        // use retangle formula to detect 
+        // collsions with bases or a touchdown
+        // ====================================================================
+        function detectAndResolveCollisionRectangles(p1, p2) {
+            let poly1 = getRectangleVertices(p1);
+            let poly2 = getRectangleVertices(p2);
+            let collisionInfo = polygonCollision(poly1, poly2);
+            if (collisionInfo) {
+                let mtv = {
+                x: collisionInfo.axis.x * collisionInfo.overlap,
+                y: collisionInfo.axis.y * collisionInfo.overlap
+                };
+                let dx = p2.x - p1.x;
+                let dy = p2.y - p1.y;
+                let dot = dx * mtv.x + dy * mtv.y;
+                if (dot < 0) {
+                mtv.x = -mtv.x;
+                mtv.y = -mtv.y;
+                }
+                const damping = 0.8;
+                p1.x -= mtv.x * 0.5 * damping;
+                p1.y -= mtv.y * 0.5 * damping;
+                p2.x += mtv.x * 0.5 * damping;
+                p2.y += mtv.y * 0.5 * damping;
+                const restitution = 0.5;
+                let relativeVx = p2.vx - p1.vx;
+                let relativeVy = p2.vy - p1.vy;
+                let normalDotVelocity = relativeVx * collisionInfo.axis.x + relativeVy * collisionInfo.axis.y;
+                if (normalDotVelocity < 0) {
+                let impulse = -(1 + restitution) * normalDotVelocity / (p1.mass + p2.mass);
+                p1.vx -= impulse * p1.mass * collisionInfo.axis.x;
+                p1.vy -= impulse * p1.mass * collisionInfo.axis.y;
+                p2.vx += impulse * p2.mass * collisionInfo.axis.x;
+                p2.vy += impulse * p2.mass * collisionInfo.axis.y;
+                }
+                adjustHeadingOnCollision(p1, p2, collisionInfo.overlap);
+                adjustHeadingOnCollision(p2, p1, collisionInfo.overlap);
+            }
+        }
+
+        // =======================================================DRAW PLAYER
+        // Draw the player bases and dials 
+        // ====================================================================    
+        const playerImage = new Image();
+        playerImage.src = "images/ef-g-saints.png"; // Replace with your image path  
+
+        function createPlayer(x, y, label, baseColor, dialColor, team, initialHeading) {
+            return {
+                baseWidth: 50,
+                baseHeight: 30,
+                x: x,
+                y: y,
+                heading: initialHeading !== undefined ? initialHeading : degToRad(parseInt(globalBaseControl.value)) + (team === 2 ? Math.PI : 0),
+                dialValue: 50,
+                label: label,
+                baseColor: baseColor,
+                dialColor: dialColor,
+                vx: 0,
+                vy: 0,
+                mass: 1 + Math.random() * 0.2,
+                hasBall: label === "QB" && ((team === 1 && isTeam1Offense) || (team === 2 && !isTeam1Offense)), // Ball to QB of offense
+                image: playerImage, // Reference to the preloaded image
+                showLargeDial: false,  // Flag to indicate whether to show the larger dial when right click
+                selected: false,
+
+                update: function() {
+                    if (formationModeCheckbox.checked) return;
+                    if (gameSwitch.checked) {
+                        let currentGlobalBase = degToRad(parseInt(globalBaseControl.value));
+                        let delta = currentGlobalBase - prevGlobalBase;
+                        this.heading += delta;
+                        prevGlobalBase = currentGlobalBase;
+                        baseSpeed = 0.5 * parseFloat(gameSpeedControl.value);
+                        let dialSteering = ((this.dialValue - 50) / 50) * maxTurnRate;
+                        this.heading += dialSteering;
+                        this.heading += (Math.random() - 0.5) * 0.05;
+                        this.vx += baseSpeed * Math.cos(this.heading) * 0.1;
+                        this.vy += baseSpeed * Math.sin(this.heading) * 0.1;
+                        const friction = 0.95;
+                        this.vx *= friction;
+                        this.vy *= friction;
+                        this.x += this.vx;
+                        this.y += this.vy;
+                        // VERTICAL BOUNDARY CHECKS - OUT OF BOUNDS
+                        if (this.y < this.baseHeight / 2) {
+                        this.y = this.baseHeight / 2;
+                        this.vy = -this.vy * 0.5;
+                        }
+                        if (this.y > canvas.height - this.baseHeight / 2) {
+                        this.y = canvas.height - this.baseHeight / 2;
+                        this.vy = -this.vy * 0.5;
+                        }
+                        // Horizontal boundary checks - END ZONES
+                        if (this.x < this.baseWidth / 2) {
+                            this.x = this.baseWidth / 2;
+                            this.vx = -this.vx * 0.5;
+                        }
+                        if (this.x > canvas.width - this.baseWidth / 2) {
+                            this.x = canvas.width - this.baseWidth / 2;
+                            this.vx = -this.vx * 0.5;
+                        }
+                    }
+                },
+                draw: function() {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.heading);
+
+                    // ==================Draw base
+                    ctx.fillStyle = this === draggingPlayer ? "yellow" : this.baseColor;
+                    drawRoundedRect(ctx, -this.baseWidth/2, -this.baseHeight/2, this.baseWidth, this.baseHeight, 5);
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.2)"; // Orange with 50% opacity
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(-this.baseWidth/2 - 1, -this.baseHeight/2 - 1, this.baseWidth + 1, this.baseHeight + 1);
+
+
+                    // ==================Draw dial
+                    const dialRadius = Math.min(this.baseWidth, this.baseHeight) * 0.45;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, dialRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.dialColor;
+                    //ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "rgba(255, 255, 255, .6)";
+                    ctx.stroke();
+                    ctx.closePath();
+                    let dialIndicatorAngle = ((this.dialValue - 50) / 50) * (Math.PI/2);
+                    const indicatorLength = dialRadius - 4;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(indicatorLength * Math.cos(dialIndicatorAngle), indicatorLength * Math.sin(dialIndicatorAngle));
+                    ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                    ctx.closePath();
+
+                    // ==================Draw label
+                    // Determine the current LOS for orientation (use canvas center if LOS is null)
+                    const currentLOS = (lineOfScrimmageX !== null) ? lineOfScrimmageX : canvas.width / 2;
+                    // Check if this player is to the right of LOS
+                    const isRightTeam = this.x > currentLOS;
+                    // Draw label text with conditional 180° rotation
+                    ctx.save();
+                    if (isRightTeam) {
+                        // Rotate 180° if on the right side
+                        ctx.rotate(Math.PI);
+                        ctx.fillStyle = "white";
+                        ctx.font = "10px Arial";
+                        ctx.textAlign = "center";
+                        // After rotation, adjust the y-offset (use -4 instead of 4)
+                        ctx.fillText(this.label, 15, 4);
+                    } else {
+                        ctx.fillStyle = "black";
+                        ctx.font = "10px Arial";
+                        ctx.textAlign = "center";
+                        ctx.fillText(this.label, -15, 4);
+                    }
+                    ctx.restore();
+
+                    // ==================Draw ball
+                    if (this.hasBall) {
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)"; // highlight with 50% opacity
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(-this.baseWidth/2 - 1, -this.baseHeight/2 - 1, this.baseWidth + 1, this.baseHeight + 1);
+                        ctx.fillStyle = "brown";
+                        ctx.beginPath();
+                        ctx.ellipse(0, -this.baseHeight / 2 , 10, 6, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(-2, -this.baseHeight / 2 , 4, 2);
+                    }
+
+                    // Draw the player image instead of the rectangle
+                   // if (this.image.complete && this.image.naturalWidth !== 0) {
+                    ctx.drawImage(
+                            this.image,
+                            -this.baseWidth / 2,
+                            -this.baseHeight / 2,
+                            this.baseWidth * 1,
+                            this.baseHeight * 1
+                        );
+                   // } else {
+                        // Fallback to rectangle if image fails to load
+                       // ctx.fillStyle = this === draggingPlayer ? "yellow" : this.baseColor;
+                      //  drawRoundedRect(ctx, -this.baseWidth / 2, -this.baseHeight / 2, this.baseWidth, this.baseHeight, 5);
+                    //}
+
+                    // == PASSING SELECTIONS HIGHLIGHT
+                    if (this.isEligible && passMode) {
+                        ctx.strokeStyle = "#ffff00"; // Yellow for eligible
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(-this.baseWidth / 2 - 2, -this.baseHeight / 2 - 2, this.baseWidth + 4, this.baseHeight + 4);
+                    }
+
+                    if (this.selected) {
+                        ctx.strokeStyle = "#00ffff";
+                        ctx.lineWidth = 4;
+                        ctx.strokeRect(-this.baseWidth / 2 - 3, -this.baseHeight / 2 - 3, this.baseWidth + 6, this.baseHeight + 6);
+                    }
+                    ctx.restore();
+                }
+            };
+            
+        }
+
+        function drawRoundedRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        let team1Players = [];
+        let team2Players = [];
+
+
+        function drawLargeDialOverlay(player) {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(player.heading);
+
+            // Calculate dial radii
+            let normalDialRadius = Math.min(player.baseWidth, player.baseHeight) * 0.45;
+            let largeDialRadius = normalDialRadius * 3;
+
+            // Draw dial fill with 15% opacity
+            ctx.globalAlpha = 0.25;
+            ctx.beginPath();
+            ctx.arc(0, 0, largeDialRadius, 0, Math.PI * 2);
+            ctx.fillStyle = player.dialColor;
+            ctx.fill();
+            ctx.closePath();
+
+            // Draw outer edge with 50% opacity
+            ctx.globalAlpha = 0.6;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "white";
+            ctx.beginPath();
+            ctx.arc(0, 0, largeDialRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.closePath();
+
+            // Draw heading line (assuming dialValue mapping as before)
+            let dialIndicatorAngle = ((player.dialValue - 50) / 50) * (Math.PI / 2);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(largeDialRadius * Math.cos(dialIndicatorAngle), largeDialRadius * Math.sin(dialIndicatorAngle));
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.closePath();
+
+            ctx.restore();
+            ctx.globalAlpha = 1;
+        }
+
+        // =======================================================CREATE TEAMS
+        function createTeams() {
+            console.log('Creating teams');
+            team1Players = [];
+            team2Players = [];
+            const playerCount = formationLabels.length;
+            const canvasHeight = canvas.height;
+            const spacing = canvasHeight / (playerCount + 1);
+            const globalOffset = degToRad(parseInt(globalBaseControl.value));
+            for (let i = 0; i < playerCount; i++) {
+                let y = spacing * (i + 1);
+                team1Players.push(createPlayer(
+                100, y, formationLabels[i], team1BaseColor, team1DialColor, 1, globalOffset
+                ));
+            }
+            for (let i = 0; i < playerCount; i++) {
+                let y = spacing * (i + 1);
+                team2Players.push(createPlayer(
+                700, y, formationLabels[i], team2BaseColor, team2DialColor, 2, globalOffset + Math.PI
+                ));
+            }
+            console.log('Teams created: ' + team1Name + ':', team1Players.length, team2Name + ':', team2Players.length);
+        }
+
+        // Replace the resetFormation function
+        // Replace only the offensePositions and defensePositions objects in resetFormation
+
+        function resetFormation(initialLOS = null, offensePlay = "I-Formation", defensePlay = "4-3 Defense") {
+            //console.log('Creating teams around line of scrimmage -' + lineOfScrimmageX);
+            team1Players = [];
+            team2Players = [];
+            const playerCount = formationLabels.length;
+            const canvasHeight = canvas.height;
+            const spacing = canvasHeight / (playerCount + 1);
+            const globalOffset = degToRad(parseInt(globalBaseControl.value));
+            
+            // Use initialLOS if provided (game start), otherwise lineOfScrimmageX or center
+            const losX = initialLOS !== null ? initialLOS : (lineOfScrimmageX !== null ? lineOfScrimmageX : canvas.width / 2);
+            console.log("losX:", losX, "canvas.width:", canvas.width, "lineOfScrimmageX:", lineOfScrimmageX, "yardstofirst:", yardsToFirst);
+            const offenseHeading = teamDirection === 1 ? globalOffset : globalOffset + Math.PI;
+            const defenseHeading = teamDirection === 1 ? globalOffset + Math.PI : globalOffset;
+            const offenseTeam = isTeam1Offense ? team1Players : team2Players;
+            const defenseTeam = isTeam1Offense ? team2Players : team1Players;
+            const offenseBaseColor = isTeam1Offense ? team1BaseColor : team2BaseColor;
+            const offenseDialColor = isTeam1Offense ? team1DialColor : team2DialColor;
+            const defenseBaseColor = isTeam1Offense ? team2BaseColor : team1BaseColor;
+            const defenseDialColor = isTeam1Offense ? team2DialColor : team1DialColor;
+            const offenseTeamNum = isTeam1Offense ? 1 : 2;
+            const defenseTeamNum = isTeam1Offense ? 2 : 1;
+
+            isTeam1Offense 
+                    ? (isRightTeam ? firstDownLine = startingLOS + 120 : firstDownLine = startingLOS - 120) 
+                    : (isRightTeam ? firstDownLine = startingLOS - 120 : firstDownLine = startingLOS + 120);
+            isTeam1Offense 
+                    ? (isRightTeam ? scoringBoundary = canvas.width - 120 : scoringBoundary = 120) 
+                    : (isRightTeam ? scoringBoundary = 120: scoringBoundary = canvas.width - 120)
+            isTeam1Offense 
+                    ? (isRightTeam ? flipx= 1 : flipx = -1) 
+                    : (isRightTeam ? flipx = -1: flipx = 1)
+                    
+            const yTP = Number(yardsToPixels) * flipx;
+            console.log("yard to first") + yardsToFirst;
+            console.log("Calling getOffensePositions with:", { offensePlay, losX, canvasHeight, yTP }); // Debug call
+            const offensePositions = getOffensePositions(offensePlay, losX, canvasHeight, yTP);
+            console.log("Calling getDefensePositions with:", { defensePlay, losX, canvasHeight, yTP }); // Debug call
+            const defensePositions = getDefensePositions(defensePlay, losX, canvasHeight, yTP);
+
+            // ============================SETUP THE OFFENSE PLAY
+            // OLD SETUP NOW CALLING FROM playsBasic.js
+            //const offensePositions = {
+               // "C": { x: losX - (3 * yTP), y: canvasHeight / 2 },             // Center on LOS
+               // "RG": { x: losX - (3 * yTP), y: canvasHeight / 2 - 30 },       // Right Guard
+               // "LG": { x: losX - (3 * yTP), y: canvasHeight / 2 + 30 },       // Left Guard
+               // "RT": { x: losX - (3 * yTP), y: canvasHeight / 2 - 60 },       // Right Tackle
+               // "LT": { x: losX - (3 * yTP), y: canvasHeight / 2 + 60 },       // Left Tackle
+               // "WR1": { x: losX - (3 * yTP), y: canvasHeight / 2 - 180 },     // Wide Receiver 1
+              //  "WR2": { x: losX - (3 * yTP), y: canvasHeight / 2 + 180 },     // Wide Receiver 2
+              //  "QB": { x: losX - (8 * yTP), y: canvasHeight / 2 },            // QB behind
+              //  "RB": { x: losX - (8 * yTP), y: canvasHeight / 2 + 60 },       // RB further back
+              //  "TE": { x: losX - (3 * yTP), y: canvasHeight / 2 + 120 },      // Tight End slightly back
+               // "FB": { x: losX - (12 * yTP), y: canvasHeight / 2 - 120 }      // Fullback behind
+            //};
+
+            // ============================SETUP THE DEFENSE PLAY
+            // Defense: Mirror offense on the other side
+            //const defensePositions = {
+               // "DLT": { x: losX + (3 * yTP), y: canvasHeight / 2 + 50 },      // DEFENSE LEFT TACKLE
+               // "DRT": { x: losX + (3 * yTP), y: canvasHeight / 2 - 50 },      // DEFENSE RIGHT TACKLE
+               // "DLE": { x: losX + (3 * yTP), y: canvasHeight/ 2 + 100 },      // DEFENSE LEFT END
+              //  "DRE": { x: losX + (3 * yTP), y: canvasHeight/ 2 - 100 },      // DEFENSE RIGHT END
+              //  "DLLB": { x: losX + (8 * yTP), y: canvasHeight/ 2 + 150 },     // DEFENSE LEFT LB
+              //  "DRLB": { x: losX + (8 * yTP), y: canvasHeight / 2 - 150 },    // DEFENSE RIGHT LB
+              //  "DLC": { x: losX + (12 * yTP), y: canvasHeight / 2 + 200 },    // DEFENSE LEFT CORNER
+              //  "DRC": { x: losX + (12 * yTP), y: canvasHeight / 2 - 200},     // DEFENSE RIGHT CORNER
+              //  "DMLB": { x: losX + (12 * yTP), y: canvasHeight / 2 },         // DEFENSE MIDDLE LB
+               // "DLS": { x: losX + (12 * yTP), y: canvasHeight / 2 - 120 },    // DEFENSE LEFT SAFETY
+              //  "DRS": { x: losX + (12 * yTP), y: canvasHeight / 2 + 120 }     // DEFENSE RIGHT SAFETY
+            //};
+            
+            // Create offensive team using offenseHeading.
+            Object.keys(offensePositions).forEach(label => {
+                const pos = offensePositions[label];
+                offenseTeam.push(createPlayer(
+                pos.x, pos.y, label, 
+                isTeam1Offense ? team1BaseColor : team2BaseColor, 
+                isTeam1Offense ? team1DialColor : team2DialColor, 
+                isTeam1Offense ? 1 : 2,
+                isTeam1Offense 
+                    ? (isRightTeam ? globalOffset : globalOffset + Math.PI) // SELECT DIRECTION THIS TEAM 1 1st and 3rd QTR GO RIGHT ON OFFENSE
+                    : (isRightTeam ? globalOffset + Math.PI: globalOffset)
+                ));
+            });
+
+            // Create defensive team using defenseHeading.
+            Object.keys(defensePositions).forEach(label => {
+            const pos = defensePositions[label];
+            defenseTeam.push(createPlayer(
+                pos.x, pos.y, label, 
+                isTeam1Offense ? team2BaseColor : team1BaseColor, 
+                isTeam1Offense ? team2DialColor : team1DialColor, 
+                isTeam1Offense ? 2 : 1,
+                isTeam1Offense 
+                    ? (isRightTeam ? globalOffset + Math.PI: globalOffset)
+                    : (isRightTeam ? globalOffset : globalOffset + Math.PI)
+            ));
+            });
+    
+            console.log('Teams created: ' + team1Name + ':', team1Players.length, team2Name + ':', team2Players.length);
+        }
+
+        // ===========================================PLAY SELECTOR WINDOW
+        // Overlay control functions
+        // ====================================================================
+        function showPlayOverlay() {
+
+            const overlay = document.getElementById("playOverlay");
+            const selector = document.getElementById("playSelector");
+            const offenseSelect = document.getElementById("offensePlay");
+            const defenseSelect = document.getElementById("defensePlay");
+
+            offenseSelect.innerHTML = "";
+            defenseSelect.innerHTML = "";
+
+            Object.keys(offensivePlays).forEach(play => {
+                const option = document.createElement("option");
+                option.value = play;
+                option.text = play;
+                offenseSelect.appendChild(option);
+            });
+
+            Object.keys(defensivePlays).forEach(play => {
+                const option = document.createElement("option");
+                option.value = play;
+                option.text = play;
+                defenseSelect.appendChild(option);
+            });
+
+            offenseSelect.addEventListener("change", updateFormation);
+            defenseSelect.addEventListener("change", updateFormation);
+            updateFormation();
+
+            overlay.style.display = "flex";
+
+            // Dragging logic
+            let isDragging = false;
+            let currentX;
+            let currentY;
+
+            selector.addEventListener("mousedown", startDragging);
+            document.addEventListener("mousemove", drag);
+            document.addEventListener("mouseup", stopDragging);
+
+            function startDragging(e) {
+                isDragging = true;
+                currentX = e.clientX - parseInt(selector.style.left || canvas.width / 2 - selector.offsetWidth / 2);
+                currentY = e.clientY - parseInt(selector.style.top || canvas.height / 2 - selector.offsetHeight / 2);
+                selector.style.cursor = "grabbing"; // Visual feedback
+                selector.classList.add("dragging");
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+                e.preventDefault(); // Prevent text selection
+                const x = e.clientX - currentX;
+                const y = e.clientY - currentY;
+
+                // Constrain within canvas bounds
+                const maxX = canvas.width - selector.offsetWidth / 2 - 30;
+                const maxY = canvas.height - selector.offsetHeight /2 - 30;
+                selector.style.left = Math.max(0, Math.min(x, maxX)) + "px";
+                selector.style.top = Math.max(0, Math.min(y, maxY)) + "px";
+                selector.style.position = "absolute"; // Ensure it moves
+            }
+
+            function stopDragging() {
+                isDragging = false;
+                selector.style.cursor = "move"; // Reset cursor
+                selector.classList.remove("dragging");
+            }
+        }
+
+        function hidePlayOverlay() {
+            document.getElementById("playOverlay").style.display = "none";
+        }
+
+        function updateFormation() {
+            // choose offense: always "Kickoff" if in kickoff mode, otherwise read the select
+            const offensePlay = (playState === "kickoff")
+                ? "kickoff"
+                : document.getElementById("offensePlay").value;
+
+            // choose defense however you like—either always override, or keep the dropdown
+            const defensePlay = (playState === "kickoff")
+                ? "kickoff Return"
+                : document.getElementById("defensePlay").value;
+
+            // now build the formation with those two strings
+            resetFormation(null, offensePlay, defensePlay, yardsToFirst);
+        }
+
+        function submitPlays() {
+            resetPassState();
+            const offensePlay = document.getElementById("offensePlay").value;
+
+            // === PUNT SETUP ===
+            if (offensePlay.toLowerCase() === "punt") {
+                playState = "punt";
+                isKicking = true;
+                kickType = "punt";
+                passMode = false; // ✅ prevent pass logic from interfering
+                receivingTeam = isTeam1Offense ? team2Players : team1Players;
+                fairCatchCalled = false;
+
+                // Find the punter
+                const punter = [...team1Players, ...team2Players].find(p => p.label === "P");
+                if (punter) {
+                    punter.hasBall = true;
+
+                    if (ball === null) {
+                        ball = {};
+                    }
+                    // ✅ Set ball at punter's location
+                    ball.x = punter.x;
+                    ball.y = punter.y;
+                    ball.vx = 0;
+                    ball.vy = 0;
+                    ball.isKicked = false;
+                }
+
+                showMessage("Punt mode activated. Drag to kick.");
+            } else {
+                isKicking = false;
+                kickType = null;
+            }
+
+    gameSwitchTog = 1;
+    hidePlayOverlay();
+}
+
+
+        // Attach event listener to the button
+        document.getElementById("submitPlaysButton").addEventListener("click", submitPlays);
+
+
+
+
+        // =======================================================Update resetFormationBtn listener to use default LOS (r)
+        // == Select Offense and Def Plays. 
+        // 'R' key event listener to reset formation.
+        document.addEventListener("keydown", function(e) {
+            if (e.key.toLowerCase() === 'r') {
+
+            // If the game hasn't started, show a message.
+            if (!gameStarted) {
+                // Optionally, prevent formation reset until the game has started.
+                const messageDisplay = document.getElementById("messageDisplay");
+                if (messageDisplay) {
+                messageDisplay.textContent = "Press Start Game first!";
+                messageDisplay.style.display = "block";
+                setTimeout(() => {
+                    messageDisplay.style.display = "none";
+                }, 2000);
+                }
+                return;
+            }
+
+            // If the game is in play mode, prevent resetting formation.
+            if (gameSwitch.checked) {
+                // Optionally, prevent formation reset until the game has started.
+                const messageDisplay = document.getElementById("messageDisplay");
+                if (messageDisplay) {
+                messageDisplay.textContent = "Play must end before resetting formation!";
+                messageDisplay.style.display = "block";
+                setTimeout(() => {
+                    messageDisplay.style.display = "none";
+                }, 2000);
+                }
+                return;
+            }
+            //gameSwitchTog = 1; // Allow game switch to turn on after formation reset.
+            showPlayOverlay();
+            resetFormation();
+            console.log("Formation reset via 'R' key");
+            }
+        });
+
+        resetFormationBtn.addEventListener('click', function() {
+        resetFormation(); // Use lineOfScrimmageX or default
+        if (touchdownScored) {
+            if (isRightTeam) {
+                lineOfScrimmageX = 30 * yardsToPixels; // Reset to 20-yard line
+                firstDownLine = lineOfScrimmageX + 10 * yardsToPixels;
+                console.log('RIGHT - Formation reset after touchdown,' + lineOfScrimmageX);
+            } else {
+                lineOfScrimmageX = 90 * yardsToPixels; // Reset to 80-yard line
+                firstDownLine = lineOfScrimmageX - 10 * yardsToPixels;
+                console.log('Formation reset after touchdown,' + lineOfScrimmageX);
+            }
+            down = 1;
+            yardsToFirst = 10;
+            //firstDownLine = null;
+            //startingLOS = null;
+            touchdownScored = false;
+            console.log('Formation reset after touchdown');
+        }
+        touchdownScored = false;
+        console.log('Formation reset');
+        });
+
+        // ===============================PLAYER MOVE OLDER VERSION
+        let draggingPlayer = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        //canvas.addEventListener('mousedown', function (e) {
+          //  if (e.button === 0 && formationModeCheckbox.checked) {
+            //    let rect = canvas.getBoundingClientRect();
+              //  let mouseX = e.clientX - rect.left;
+        //        let mouseY = e.clientY - rect.top;
+        //        let allPlayers = team1Players.concat(team2Players);
+        //        for (let player of allPlayers) {
+        //            if (mouseX >= player.x - player.baseWidth / 2 &&
+        //                mouseX <= player.x + player.baseWidth / 2 &&
+        //                mouseY >= player.y - player.baseHeight / 2 &&
+        //                mouseY <= player.y + player.baseHeight / 2) {
+        //                draggingPlayer = player;
+        //                dragOffsetX = mouseX - player.x;
+        //                dragOffsetY = mouseY - player.y;
+         //               break;
+        //            }
+        //        }
+        //    }
+        //});
+
+        canvas.addEventListener('mousemove', function(e) {
+        if (formationModeCheckbox.checked && draggingPlayer && e.buttons === 1) {
+            let rect = canvas.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            let mouseY = e.clientY - rect.top;
+            draggingPlayer.x = mouseX - dragOffsetX;
+            draggingPlayer.y = mouseY - dragOffsetY;
+        }
+        if (dialAdjustingPlayer) {
+            let rect = canvas.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            let mouseY = e.clientY - rect.top;
+            let dx = mouseX - dialAdjustingPlayer.x;
+            let dy = mouseY - dialAdjustingPlayer.y;
+            let cosA = Math.cos(-dialAdjustingPlayer.heading);
+            let sinA = Math.sin(-dialAdjustingPlayer.heading);
+            let localX = dx * cosA - dy * sinA;
+            let localY = dx * sinA + dy * cosA;
+            let angle = Math.atan2(localY, localX);
+            if (angle < -Math.PI/2) angle = -Math.PI/2;
+            if (angle > Math.PI/2) angle = Math.PI/2;
+            dialAdjustingPlayer.dialValue = 50 + (angle/(Math.PI/2))*50;
+        }
+        });
+
+// ============================================================================DELETE FROM GAME
+       // canvas.addEventListener('mouseup', function(e) {
+       // if (e.button === 0) draggingPlayer = null;
+       // if (e.button === 2) dialAdjustingPlayer = null;
+       // });
+
+       // canvas.addEventListener('mouseleave', function(e) {
+       // draggingPlayer = null;
+       // dialAdjustingPlayer = null;
+       // });
+
+       // canvas.addEventListener('contextmenu', function(e) {
+       // e.preventDefault();
+       // });
+// ============================================================================DELETE FROM GAME^^
+
+
+        // ================================================RIGHT CLICK TO ADJUST DIAL
+        // ** Right CLick to adjust dial. makes dial bigger in draw player function
+        // ** Sets flag showLargeDial on mousedown and clears 
+        // =========================================================================
+        canvas.addEventListener("contextmenu", function(e) {
+            e.preventDefault(); // Prevent the context menu from appearing
+        }); 
+        canvas.addEventListener('mousedown', function(e) {
+            if (e.button === 2) { // Right mouse button
+                let rect = canvas.getBoundingClientRect();
+                let mouseX = e.clientX - rect.left;
+                let mouseY = e.clientY - rect.top;
+                let allPlayers = team1Players.concat(team2Players);
+                for (let player of allPlayers) {
+                let normalDialRadius = Math.min(player.baseWidth, player.baseHeight) * 0.45;
+                let dx = mouseX - player.x;
+                let dy = mouseY - player.y;
+                if (Math.sqrt(dx * dx + dy * dy) <= normalDialRadius + 5) {
+                    dialAdjustingPlayer = player;
+                    console.log('mousedown dialAdjustingPlayer' + dialAdjustingPlayer);
+                    player.showLargeDial = true; // Set flag to show the large dial overlay.
+                    break;
+                }
+                }
+            }
+        });
+        // Listen for mouseup on the document to clear the flag,
+        // ensuring it works even if the mouse is released outside the canvas.
+        // Clear the flag on right mouse button up
+        canvas.addEventListener('mouseup', function(e) {
+            if (e.button === 2 && dialAdjustingPlayer) {
+                console.log('mouseup dialAdjustingPlayer:', dialAdjustingPlayer);
+                dialAdjustingPlayer.showLargeDial = false;
+                dialAdjustingPlayer = null;
+            }
+        });
+
+        // Optional: Clear the flag if the mouse leaves the canvas while right-click is active
+        canvas.addEventListener('mouseleave', function(e) {
+        if (dialAdjustingPlayer) {
+            dialAdjustingPlayer.showLargeDial = false;
+            dialAdjustingPlayer = null;
+        }
+        });
+        // =======================================================END RIGHT CLICK TO ADJUST DIAL
+
+
+
+        let touchdownScored = false;
+
+
+        // ================================================SELECT AND DRAG/ROTATE PLAYERS
+        // ** Select player
+        // ** Drag player to location. Rotate player with mouse wheel
+        // ==============================================================================
+
+
+        // Mousedown: check for shift-click on a player
+        canvas.addEventListener("mousedown", (e) => {
+
+            if (e.button ===0 && !isKicking) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Combine players from both teams (adjust if you have a different structure)
+                const allPlayers = [...team1Players, ...team2Players];
+                
+                // Look for a player whose bounding box contains the mouse coordinates.
+                // Here we assume the player's base is centered at (player.x, player.y)
+                for (let player of allPlayers) {
+                if (
+                    mouseX >= player.x - player.baseWidth / 2 &&
+                    mouseX <= player.x + player.baseWidth / 2 &&
+                    mouseY >= player.y - player.baseHeight / 2 &&
+                    mouseY <= player.y + player.baseHeight / 2
+                ) {
+                    draggingPlayer = player;
+                    // Store the offset so the player doesn't jump to the mouse pointer
+                    dragOffsetX = mouseX - player.x;
+                    dragOffsetY = mouseY - player.y;
+                    break;
+                }
+                }
+            }
+
+            if (passMode && !selectedReceiver) {
+                const mx = e.clientX - canvas.getBoundingClientRect().left;
+                const my = e.clientY - canvas.getBoundingClientRect().top;
+
+                const eligibleReceivers = (isTeam1Offense ? team1Players : team2Players)
+                    .filter(p => !p.hasBall && !p.label.includes("C")); // exclude QB & center maybe
+
+                for (let receiver of eligibleReceivers) {
+                    if (
+                        mx >= receiver.x - receiver.baseWidth / 2 &&
+                        mx <= receiver.x + receiver.baseWidth / 2 &&
+                        my >= receiver.y - receiver.baseHeight / 2 &&
+                        my <= receiver.y + receiver.baseHeight / 2
+                    ) {
+                        eligibleReceivers.forEach(p => p.selected = false); // clear others
+                        receiver.selected = true;
+                        selectedReceiver = receiver;
+                        showMessage("Drag to aim and release to throw!");
+                        break;
+                    }
+                }
+            }
+
+
+            if (passMode && selectedReceiver) {
+                const QB = [...team1Players, ...team2Players].find(p => p.label === "QB" && p.hasBall);
+                const dx = e.offsetX - QB.x;
+                const dy = e.offsetY - QB.y;
+                if (Math.hypot(dx, dy) < 50) {
+                    dragging = true;
+                    dragStart = { x: e.offsetX, y: e.offsetY };
+                    dragCurrent = { x: e.offsetX, y: e.offsetY };
+                }
+            }
+
+            if (isKicking && kickType === "punt") {
+                kickDragStart = { x: e.offsetX, y: e.offsetY };
+                kickDragEnd = null;
+                isDraggingKick = true;
+                console.log("Punt drag started at:", kickDragStart);
+            }
+            if (isKicking && kickType === "kickoff") {
+                kickDragStart = { x: e.offsetX, y: e.offsetY };
+                kickDragEnd = null;
+                isDraggingKick = true;
+                console.log("Kickoff drag started at:", kickDragStart);
+            }
+
+        });
+
+
+
+        // ===================Mousemove: if dragging, update the player's position
+        canvas.addEventListener("mousemove", (e) => {
+            if (!passMode && draggingPlayer && !playActive) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                draggingPlayer.x = mouseX - dragOffsetX;
+                draggingPlayer.y = mouseY - dragOffsetY;
+            }
+
+            if (passMode && dragging) {
+                dragCurrent.x = e.offsetX;
+                dragCurrent.y = e.offsetY;
+            }
+
+            if (isDraggingKick && kickType === "punt") {
+                kickDragEnd = { x: e.offsetX, y: e.offsetY };
+            }
+            if (isDraggingKick && kickType === "kickoff") {
+                kickDragEnd = { x: e.offsetX, y: e.offsetY };
+            }
+        });
+
+        // Mouse wheel: rotate the player while holding Shift
+        canvas.addEventListener("wheel", (e) => {
+            if (draggingPlayer) {
+                // Adjust the heading based on the wheel's delta.
+                // Multiply deltaY by a sensitivity factor (0.01 in this case)
+                draggingPlayer.heading += e.deltaY * 0.001;
+                e.preventDefault(); // Prevent page scrolling while rotating
+            }
+        });
+
+        // Mouseup (or when the mouse leaves the canvas): stop dragging
+        canvas.addEventListener("mouseup", (e) => {
+            draggingPlayer = null;
+            if (dragging) {
+                dragging = false;
+
+                const dx = dragStart.x - dragCurrent.x;
+                const dy = dragStart.y - dragCurrent.y;
+                const angle = Math.atan2(dy, dx);
+                const power = Math.min(Math.hypot(dx, dy), 200) * 0.15;
+
+                const QB = [...team1Players, ...team2Players].find(p => p.label === "QB" && p.hasBall);
+                ball = {
+                    x: QB.x,
+                    y: QB.y,
+                    vx: Math.cos(angle) * power,
+                    vy: Math.sin(angle) * power
+                };
+
+                QB.hasBall = false;
+                console.log("Ball thrown");
+                passMode = false;
+                [...team1Players, ...team2Players].forEach(p => {
+                    p.selected = false;
+                    p.isEligible = false;
+                });
+                gameSwitch.checked = true;
+                gameSwitch.dispatchEvent(new Event("change"));
+                console.log("Game switch checked:", gameSwitch.checked);
+            }
+
+            if (isDraggingKick && isKicking) {
+                isDraggingKick = false;
+                kickDragEnd = { x: e.offsetX, y: e.offsetY };
+
+                // Compute direction and power
+                const dx = kickDragStart.x - kickDragEnd.x;
+                const dy = kickDragStart.y - kickDragEnd.y;
+
+                const dragDistance = Math.hypot(dx, dy);
+                const cappedPower = Math.min(dragDistance, MAX_PUNT_PIXELS);
+
+                const angle = Math.atan2(dy, dx);
+                const power = cappedPower; // or apply scaling if needed
+
+                // Store for delayed kick
+                pendingKick = { angle, power };
+
+                // Start play immediately
+                gameSwitch.checked = true;
+                gameSwitch.dispatchEvent(new Event("change"));
+                playActive = true; // Set playActive to true when game is on
+
+                // Delay the punt
+                if (kickType === "punt") {
+                    showMessage("Punt in 1 second... w distance: " + dragDistance + " cappedPower: " + cappedPower);
+                    setTimeout(() => {
+                        if (pendingKick) {
+                            kickBall(pendingKick.angle, pendingKick.power, "punt");
+                            pendingKick = null;
+                        }
+                    }, 500); // 1 second delay
+                }
+                if (kickType === "kickoff") {
+                    showMessage("Kickoff !");
+                    kickBall(pendingKick.angle, pendingKick.power, "kickoff");
+                    console.log("Kickoff kicked at angle:", angle, "power:", power);  
+                }
+                // Reset drag state
+                kickDragStart = kickDragEnd = null;
+            }
+
+        });
+
+
+        canvas.addEventListener("mouseleave", () => {
+        draggingPlayer = null;
+        });
+
+
+        // ===================================================== END DRAG PLAYERS
+
+
+        // ===================================================== KICKOFF FUNCTION
+        // ** Reset for kickoff
+        // ** set los and first down
+        // ======================================================================
+
+        function kickoff() {
+            console.log("Kickoff initiated: resetting variables for a new drive.");
+              // — flip possession so scoring team becomes kicking team —
+            if (touchdownScored) {
+                isTeam1Offense = !isTeam1Offense;
+                touchdownScored = false
+            }
+            playState = "kickoff";
+            isKicking = true;
+            kickType = "kickoff";
+            passMode = false; // ✅ prevent pass logic from interfering
+            gameSwitchTog = 1; // Allow game switch to turn on after kickoff
+            
+            fairCatchCalled = false;
+            // Reset drive variables
+            down = 1;
+            yardsToFirst = 10;
+            kickoffYard = isRightTeam && !isTeam1Offense
+                ? 75           // kicking to the right
+                : 45;          // kicking to the left
+            startingLOS      = kickoffYard * yardsToPixels;
+            lineOfScrimmageX = startingLOS;
+            console.log("Kickoff yardage:", kickoffYard, "lineOfScrimmageX:", lineOfScrimmageX);
+            updateFormation();
+
+            // Find the kicker
+            receivingTeam = isTeam1Offense ? team2Players : team1Players;
+            const kicker = [...team1Players, ...team2Players].find(p => p.label === "K");
+            if (kicker) {
+                kicker.hasBall = true;
+
+                if (ball === null) {
+                    ball = {};
+                }
+                // ✅ Set ball at punter's location
+                ball.x = kicker.x;
+                ball.y = kicker.y;
+                ball.vx = 0;
+                ball.vy = 0;
+                ball.isKicked = false;
+            }
+
+            
+            // Update the scoreboard and any other display elements.
+            updateScores();
+            
+            console.log("Kickoff complete: New drive begins." + lineOfScrimmageX);
+        }
+
+        // ===============================HANDLING THE PUNT
+        function kickBall(angle, power, type) {
+            //const punter = [...team1Players, ...team2Players].find(p => p.label === "P");
+            const punter        = [...team1Players, ...team2Players].find(p => p.label === "P");
+            const kickoffKicker = [...team1Players, ...team2Players].find(p => p.label === "K") || punter;
+              // remove the ball from whoever’s kicking
+            const kicker = (type === "kickoff") ? kickoffKicker : punter;
+            kicker.hasBall = false;
+            // Make sure kicker  doesn't carry the ball anymore
+            if (kicker) kicker.hasBall = false;
+
+            ball.x = kicker.x;
+            ball.y = kicker.y;
+            ball.vx = Math.cos(angle) * (power / 5);
+            ball.vy = Math.sin(angle) * (power / 5);
+            ball.isKicked = true;
+
+            ball.rotation = 0;      // rotation angle in radians
+            ball.trail    = [];     // array of previous positions
+
+            console.log("Ball punted at angle:", angle, "power:", power);
+
+            isKicking = false;
+            kickType = null;
+            passMode = false;
+            selectedReceiver = null;
+            dragging = false;
+            dragStart = null;
+            dragCurrent = null;
+        }
+
+
+        // ========================================= TACKLE CODE
+
+        /**
+         * Always returns the forward‐most X of the carrier rectangle
+         * based solely on flipx (1=right, -1=left).
+         */
+        function getFrontEdgeX(vertices) {
+        if (flipx === 1) {
+            const mx = Math.max(...vertices.map(v => v.x));
+            console.log('Front edge (right) =', mx, 'flipx=', flipx);
+            return mx;
+        } else {
+            const mn = Math.min(...vertices.map(v => v.x));
+            console.log('Front edge (left) =', mn, 'flipx=', flipx);
+            return mn;
+        }
+        }
+
+
+
+        // =========================================Replace resolveAllCollisions
+        function resolveAllCollisions() {
+
+            let allPlayers = team1Players.concat(team2Players);
+            grid.clear();
+            allPlayers.forEach(p => grid.addPlayer(p));
+
+            for (let i = 0; i < allPlayers.length; i++) {
+                let p1 = allPlayers[i];
+                let nearby = grid.getNearbyPlayers(p1);
+
+                for (let p2 of nearby) {
+                detectAndResolveCollisionRectangles(p1, p2);
+
+                if ((p1.hasBall && p2.baseColor !== p1.baseColor) || (p2.hasBall && p1.baseColor !== p2.baseColor)) {
+                    let ballCarrier = p1.hasBall ? p1 : p2;
+                    let defender = ballCarrier === p1 ? p2 : p1;
+                    let polyCarrier = getRectangleVertices(ballCarrier);
+                    let polyDefender = getRectangleVertices(defender);
+
+                    if (disableTackles) return; // Skip collision processing if disabled
+
+                    //================= Player is Tackled
+                    //
+                    if (polygonCollision(polyCarrier, polyDefender)) {
+                        gameSwitch.checked = false; // Uncheck the switch
+                        isPlaying = false; // Stop animation immediately
+                        gameSwitchTog = 0; // Prevent turning on again until formation reset
+                        stopVibratingSound();
+                        const vertices = getRectangleVertices(ballCarrier);
+                        // lineOfScrimmageX = isTeam1Offense
+                        //     ? (flipx === 1 ? Math.max(...vertices.map(v => v.x)) : Math.min(...vertices.map(v => v.x)))
+                        //     : (flipx === -1 ? Math.min(...vertices.map(v => v.x)) : Math.max(...vertices.map(v => v.x)));
+                        let originalFlip = flipx;
+                        if (playState === 'kickoff' || playState === 'punt') { // for kickoff and punts we have to flip flipx to get the front end of base for LOS
+                            flipx = -flipx;
+                        }
+                        lineOfScrimmageX = getFrontEdgeX(getRectangleVertices(ballCarrier));
+
+                        const yardsGained = Math.abs(
+                            isTeam1Offense
+                            ? ((lineOfScrimmageX - startingLOS)) //flipx flips the field for qtrs
+                            : ((startingLOS - lineOfScrimmageX))
+                        ) / yardsToPixels;
+
+                        // ====TACKLE MADE add Sounds and update
+                        whistle1.play(); // play whistle sound
+                        whistle1.volume = 0.3;
+                        whistle1.length = 0.5;
+                        gamestateoff();
+                        console.log('Tackle detected, line of scrimmage set at x:', lineOfScrimmageX, 'Yards gained:', yardsGained);
+
+                        if (yardsGained >= yardsToFirst) {
+                            //console.log('yardsgained:', yardsGained, 'yardsToFirst:', yardsToFirst);
+                            down = 1;
+                            yardsToFirst = 10;
+                            startingLOS = lineOfScrimmageX;
+                            isTeam1Offense 
+                                ? (isRightTeam ? firstDownLine = startingLOS + 120 : firstDownLine = startingLOS - 120) 
+                                : (isRightTeam ? firstDownLine = startingLOS - 120 : firstDownLine = startingLOS + 120);
+                            //firstDownLine = isTeam1Offense ? startingLOS + 120 * flipx: startingLOS - 120 * flipx;
+                            //console.log('First down achieved, new LOS:', startingLOS, 'New first down line:', firstDownLine);
+                        } else {
+                            down++;
+                            //console.log('Tackle made, yardsgained:', yardsGained, 'Yards to first:', yardsToFirst);
+                            yardsToFirst = yardsToFirst - yardsGained;
+                            //console.log('calculatione, YG:', yardsGained, 'Yards to first:', yardsToFirst);
+                            // == 4th down turn over possesion
+                            if (down > 4) {
+                                down = 1;
+                                yardsToFirst = 10;
+                                isTeam1Offense = !isTeam1Offense;
+                                startingLOS = lineOfScrimmageX;
+                                isTeam1Offense 
+                                    ? (isRightTeam ? firstDownLine = startingLOS + 120 : firstDownLine = startingLOS - 120) 
+                                    : (isRightTeam ? firstDownLine = startingLOS - 120 : firstDownLine = startingLOS + 120);
+                            //firstDownLine = isTeam1Offense ? startingLOS - 120 * flipx: startingLOS + 120 * flipx;
+                            //console.log('Turnover on downs, possession switched to', isTeam1Offense ? team1Name : team2Name);
+                            } else {
+                            //console.log(`Down ${down}, ${yardsToFirst.toFixed(0)} yards to first`);
+                            }
+                        }
+                        endPlay();
+                        updateScores();
+                        return;
+                    }
+                }
+                }
+
+                if (!touchdownScored && p1.hasBall) {
+                        console.log('CheckingFor Touchdown Call');
+                        checkForTouchdown();
+                }
+            }
+        }
+
+        function checkForTouchdown() {
+            console.log('Checking for touchdown direction' + teamDirection);
+            // Find the ball carrier (assuming only one player can have the ball)
+
+            if (team1Players.some(p => p.hasBall)) {
+                ballCarrier = team1Players.find(p => p.hasBall);
+                ballTeam = 1;
+                console.log('Ball carrier team' + ballTeam);
+            } else if (team2Players.some(p => p.hasBall)) {
+                ballCarrier = team2Players.find(p => p.hasBall);
+                ballTeam = 2;
+                console.log('Ball carrier team' + ballTeam);
+            }
+            if (!ballCarrier) return; // No ball carrier found
+
+            // Get the player's vertices to see where they are on the field.
+            const vertices = getRectangleVertices(ballCarrier);
+        
+
+            if (isTeam1Offense && isRightTeam) { //Team 1 offense and going right
+                if (vertices.some(v => v.x >= scoringBoundary)) { // right side TD
+                    processTouchdown(ballCarrier);
+                }
+            } else if (!isTeam1Offense && isRightTeam) { //Team 2 offense and going left
+                if (vertices.some(v => v.x <= scoringBoundary)) { // left side TD
+                    processTouchdown(ballCarrier);
+                }
+            };
+            if (isTeam1Offense && !isRightTeam) { //Team 1 offense and going left
+                if (vertices.some(v => v.x <= scoringBoundary)) { //left side TD
+                    processTouchdown(ballCarrier);
+                }
+            } else if (!isTeam1Offense && !isRightTeam) { //Team 2 offense and going right
+                if (vertices.some(v => v.x >= scoringBoundary)) { //right side TD
+                    processTouchdown(ballCarrier);
+                }
+            };
+        }
+
+        function processTouchdown(ballCarrier) {
+            console.log('Touchdown detected process' + ballCarrier.x);
+            // Update score based on ballCarrier.team. Assume team 1 scores if ballCarrier.team === 1, etc.
+            let teamScored;
+            if (ballTeam === 1) {
+                team1Score += 6;
+                updateScores();
+                stopGameClock();
+                touchdownScored = true;
+                isTeam1Offense = false;
+                teamScored = team1Name;
+                console.log(team1Name + " scored a touchdown");
+            } else if (ballTeam === 2) {
+                team2Score += 6;
+                updateScores();
+                stopGameClock();
+                touchdownScored = true;
+                isTeam1Offense = true;
+                teamScored = team2Name;
+                console.log(team2Name + " scored a touchdown");
+            }
+            
+            tdCrowd.play(); // play crowd noise
+            gamestateoff();
+
+            gameState.textContent = "Touchdown " + teamScored + "!";
+            gameState.className = "game-state touchdown-team1 touchdown-flash";
+            updateScores();
+            touchdownScored = true;
+            disableTackles = true; // Disable collision detection
+            gameSwitchTog = 0; // Prevent turning on again until formation reset
+
+            // After a brief delay, reset the game state message.
+            setTimeout(() => {
+                if (gameSwitch.checked) {
+                    gameSwitch.checked = false; // Uncheck the switch
+                    isPlaying = false; // Stop animation immediately
+                    disableTackles = false; // Re-enable collision detection
+                    stopVibratingSound();
+                    if (quarterTimeRemaining > 0) {
+                        kickoff();
+                    } else {
+                        proceedToNextQuarter();
+                    }
+                }
+            }, 1000);
+        }
+
+        // =========================================== PASSING FUNCTIONS
+        function handlePass() {
+            if (!ball) return;
+
+            // Move ball
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Apply slight friction to simulate arc and slowdown
+            ball.vx *= 0.97;
+            ball.vy *= 0.97;
+
+            const speed = Math.hypot(ball.vx, ball.vy);
+
+            // Interception logic
+            const defenders = isTeam1Offense ? team2Players : team1Players;
+            for (let defender of defenders) {
+                const dx = ball.x - defender.x;
+                const dy = ball.y - defender.y;
+                const dist = Math.hypot(dx, dy);
+                const speed = Math.hypot(ball.vx, ball.vy);
+
+                if (dist < 30 && speed < 5 && speed > 0.5) {
+                    const interceptionChance = 0.7; // 20% chance (adjust as needed)
+                    if (Math.random() < interceptionChance) {
+                        defender.hasBall = true;
+                        ball = null;
+                        selectedReceiver = null;
+                        isTeam1Offense = !isTeam1Offense
+                        isTeam1Offense 
+                            ? (isRightTeam ? scoringBoundary = canvas.width - 120 : scoringBoundary = 120) 
+                            : (isRightTeam ? scoringBoundary = 120: scoringBoundary = canvas.width - 120)
+
+
+                        //gameSwitch.checked = false;
+                        //isPlaying = false;
+                        //gameSwitchTog = 0;
+                        //stopVibratingSound();
+                        //stopGameClock();
+                        //whistle1.play();
+                        // Reset down and yards
+                        down = 1;
+                        yardsToFirst = 10;
+                        showMessage("INTERCEPTION!", 2000);
+                        console.log("Intercepted by:", defender.label);
+                        //isTeam1Offense = !isTeam1Offense;
+                        //updateScores();
+                        return;
+                    }
+                }
+            }
+
+            // Catch detection
+            if (selectedReceiver) {
+                const dx = ball.x - selectedReceiver.x;
+                const dy = ball.y - selectedReceiver.y;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < 30 && speed < 10 && speed > 0.5) {
+                selectedReceiver.hasBall = true;
+                ball = null;
+                selectedReceiver = null;
+                console.log("Catch successful!");
+                return;
+                }
+            }
+
+            // Stop the ball if too slow
+            if (speed < 0.1) {
+                ball = null;
+                selectedReceiver = null;
+                console.log("Incomplete pass.");
+                handleIncompletePass();
+            }
+        }
+
+        // function drawBall() {
+        //     if (!ball) return;
+        //     ctx.fillStyle = "orange";
+        //     ctx.beginPath();
+        //     ctx.arc(ball.x, ball.y, 5, 0, Math.PI * 2);
+        //     ctx.fill();
+        // }
+
+        // ==========================DRAW THE BALL FOR PASSES AND KICKS
+        function drawBall() {
+            if (!ball) return;
+
+            // 1) Initial setup
+            ball.trail    = ball.trail    || [];
+            ball.rotation = ball.rotation || 0;
+
+            // 2) If in flight, update spin, trail, and compute scale
+            let scale = 1;
+            if (ball.isKicked) {
+                // Spin
+                ball.rotation += ball.vx * 0.02;
+
+                // Trail
+                ball.trail.push({ x: ball.x, y: ball.y });
+                if (ball.trail.length > 20) ball.trail.shift();
+
+                // Scale: faster = bigger (clamp to [1,1.5])
+                const speed = Math.hypot(ball.vx, ball.vy);
+                const maxSpeed = 30;    // tweak to taste
+                const pct      = Math.min(speed / maxSpeed, 1);
+                scale = 1 + pct * 0.9;  // from 1 → 1.5
+            }
+
+            // 3) Draw trail (unchanged)
+            ctx.save();
+            for (let i = 0; i < ball.trail.length; i++) {
+                const p     = ball.trail[i];
+                const alpha = ((i + 1) / ball.trail.length) * 0.4; 
+                ctx.fillStyle = `rgba(165,42,42,${alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // 4) Draw the scaled, spinning ball
+            ctx.save();
+            ctx.translate(ball.x, ball.y);
+            ctx.rotate(ball.rotation);
+            ctx.scale(scale, scale);
+
+            // Brown ellipse
+            ctx.fillStyle = "brown";
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // White stripe
+            ctx.fillStyle = "white";
+            ctx.fillRect(-2, -2, 4, 4);
+
+            ctx.restore();
+            }
+
+
+        function handleIncompletePass() {
+            gameSwitch.checked = false; // Uncheck the switch
+            isPlaying = false; // Stop animation immediately
+            gameSwitchTog = 0; // Prevent turning on again until formation reset
+            stopVibratingSound();
+            stopGameClock();
+            console.log("Incomplete pass");
+            whistle1.play(); // play whistle sound
+            whistle1.volume = 0.3;
+            whistle1.length = 0.5;
+            gamestateoff();
+            down++;
+
+            if (down > 4) {
+                // Turnover on downs
+                down = 1;
+                yardsToFirst = 10;
+                isTeam1Offense = !isTeam1Offense;
+
+                // LOS stays where it was when pass was thrown
+                startingLOS = lineOfScrimmageX;
+
+                // Set new first down line
+                isTeam1Offense
+                    ? (isRightTeam ? firstDownLine = startingLOS + 120 : firstDownLine = startingLOS - 120)
+                    : (isRightTeam ? firstDownLine = startingLOS - 120 : firstDownLine = startingLOS + 120);
+
+                showMessage("Turnover on Downs", 2000);
+            } else {
+                showMessage(`Incomplete Pass — Down ${down}`, 1500);
+                // Don't move LOS, just update yards to first
+                // Nothing gained, so yardsToFirst stays same
+            }
+            endPlay();
+            updateScores();
+            //gamestateoff();
+        }
+
+        function resetPassState() {
+            passMode = false;
+            selectedReceiver = null;
+            dragging = false;
+            dragStart = null;
+            dragCurrent = null;
+
+            // Deselect receivers and clear eligibility
+            [...team1Players, ...team2Players].forEach(p => {
+                p.selected = false;
+                p.isEligible = false;
+            });
+        }
+
+        function drawKickBand() {
+            if (isDraggingKick && kickDragStart && kickDragEnd) {
+                drawBand(ctx, kickDragStart, kickDragEnd, {
+                maxDist: 100,
+                tickSpacing: 10,
+                tickLen: 6,
+                color: 'yellow'
+                });
+            }
+        }
+
+        function handleDragLine() {
+            if (dragging && dragStart && dragCurrent) {
+                drawBand(ctx, dragStart, dragCurrent, {
+                maxDist: 200,        // maybe allow a longer pull for passing?
+                tickSpacing: 20,
+                tickLen: 4,
+                color: 'white'
+                });
+            }
+        }
+
+
+
+                /**
+         * Draws a “rubber‑band” from start to end, capped at maxDist, with ticks.
+         *
+         * @param {CanvasRenderingContext2D} ctx
+         * @param {{x:number,y:number}} start
+         * @param {{x:number,y:number}} endRaw
+         * @param {object} opts
+         *   - maxDist: maximum length in px (e.g. 100)
+         *   - tickSpacing: px between ticks (e.g. 10)
+         *   - tickLen: half‑length of each tick (e.g. 6)
+         *   - color: stroke color (default: 'white')
+         */
+        function drawBand(ctx, start, endRaw, opts = {}) {
+            const {
+                maxDist     = 100,
+                tickSpacing = 10,
+                tickLen     = 6,
+                color       = 'white',
+                lineWidth   = 2,
+                tickWidth   = 1
+            } = opts;
+
+            const dx   = endRaw.x - start.x;
+            const dy   = endRaw.y - start.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 0.5) return;
+
+            // unit vector
+            const ux = dx / dist;
+            const uy = dy / dist;
+            // clamp length
+            const drawDist = Math.min(dist, maxDist);
+            const ex       = start.x + ux * drawDist;
+            const ey       = start.y + uy * drawDist;
+
+            // main line
+            ctx.strokeStyle = color;
+            ctx.lineWidth   = lineWidth;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(ex, ey);
+            ctx.stroke();
+
+            // ticks
+            ctx.strokeStyle = color;
+            ctx.lineWidth   = tickWidth;
+            const numTicks = Math.floor(drawDist / tickSpacing);
+            // perpendicular
+            const px = -uy;
+            const py = ux;
+
+            for (let i = 1; i <= numTicks; i++) {
+                const t  = i * tickSpacing;
+                const tx = start.x + ux * t;
+                const ty = start.y + uy * t;
+
+                ctx.beginPath();
+                ctx.moveTo(tx + px * tickLen, ty + py * tickLen);
+                ctx.lineTo(tx - px * tickLen, ty - py * tickLen);
+                ctx.stroke();
+            }
+        }
+
+
+        // ========================HANDLE THE PUNT LOGIC DURING THE PLAY
+        // ** The punt poswer is in the event listen band dragging section
+        //**
+        function handlePunt() {
+            if (!ball || !ball.isKicked) {
+                drawKickBand(); // optional
+                return;
+            }
+
+            // Ball is in the air — update movement
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            const friction = 0.98;
+            ball.vx *= friction;
+            ball.vy *= friction;
+
+            // Check for catch
+            const catchRadius = 50;
+            let caught = false;
+
+            for (let player of receivingTeam) {
+                if (!player.hasBall) {
+                    showMessage("play running");
+                    const dx = ball.x - player.x;
+                    const dy = ball.y - player.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    const ballSlow = Math.hypot(ball.vx, ball.vy) < 8; // ✅ slow enough to catch
+                    //const ballOverLOS = ball.y > lineOfScrimmageY + 20; // ✅ adjust for team direction
+
+                    if (dist < catchRadius && ballSlow) {
+                        if (fairCatchCalled) {
+                            showMessage("Fair Catch Made!");
+                        } else {
+                            playState = "normal"; // ✅ reset play state
+                            showMessage(playState === 'kickoff' ? "Kick Return Caught!" : "Punt Caught!");
+                            ball.trail = []; // Clear the ball trail
+                        }
+
+                        player.hasBall = true;
+                        ball.isKicked = false;
+                        ball.vx = 0;
+                        ball.vy = 0;
+                        ballCarrier = player;
+                        isTeam1Offense = !isTeam1Offense
+                        isTeam1Offense 
+                             ? (isRightTeam ? scoringBoundary = canvas.width - 120 : scoringBoundary = 120) 
+                             : (isRightTeam ? scoringBoundary = 120: scoringBoundary = canvas.width - 120)
+
+                        //endPlay();
+                        caught = true;
+                        break;
+                    }
+                }
+            }
+
+
+            // Ball hits ground and stops
+            if (!caught && Math.hypot(ball.vx, ball.vy) < 0.5) {
+                showMessage("Ball Downed at Landing Spot.");
+                endPuntPlay(); // will leave ball where it is
+            }
+        }
+
+
+        function endPuntPlay() {
+            console.log("Punt complete.");
+
+
+            isTeam1Offense = !isTeam1Offense;
+            flipx = -flipx;
+            scoringBoundary = isTeam1Offense 
+                ? canvas.width - 120 
+                : 120;
+
+
+            let landingX = ball ? ball.x : lineOfScrimmageX;
+
+            const endZonePx     = 120;                       // width of each EZ
+            const twentyYdPx    = yardsToPixels * 20;        // how many px = 20 yards
+            const fieldWidth    = canvas.width;
+
+            // If it landed in the left end‑zone
+            if (landingX <= endZonePx) {
+                // Place at 20‑yard line from left goal
+                lineOfScrimmageX = endZonePx + twentyYdPx;
+            }
+            // If it landed in the right end‑zone
+            else if (landingX >= fieldWidth - endZonePx) {
+                // Place at 20‑yard line from right goal
+                lineOfScrimmageX = (fieldWidth - endZonePx) - twentyYdPx;
+            }
+            // Otherwise it’s in the field of play
+            else {
+                lineOfScrimmageX = landingX;
+            }
+
+            // 2) Reset your starting LOS for the next series
+            startingLOS = lineOfScrimmageX;
+
+            // 3) Reset downs & first‑down
+            down          = 1;
+            yardsToFirst  = 10;
+            // Calculate the new first‑down line 10 yds ahead in the current direction
+            firstDownLine = lineOfScrimmageX + (yardsToPixels * 10 * flipx);
+
+            // 4) Clean up play state
+            playState        = "normal";
+            if (ball) {
+                ball.isKicked  = false;
+                ball.vx = 0;
+                ball.vy = 0;
+            }
+            isKicking        = null;
+            kickType         = null;
+            ballCarrier      = null;
+            gameSwitch.checked = false;
+            isPlaying        = false;
+            gameSwitchTog    = 0;
+            stopVibratingSound();
+            stopGameClock();
+
+            console.log("End Punt Play — LOS set to", lineOfScrimmageX);
+            whistle1.play();
+            whistle1.volume = 0.8;
+            whistle1.length = 0.5;
+            endPlay();
+            gamestateoff();
+            updateScores();
+
+            // (Later you can add an OOB check here if ball.x < 0 or > canvas.width)
+            }
+
+
+        // ========================END PUNT LOGIC DURING THE PLAY
+        // ** START PLAY CLOCK HERE
+        function endPlay() {
+            // 1) Turn off any active play modes
+            playState      = "normal";    // back to “no special play”  
+            isKicking      = false;       // no drag‑and‑kick in progress  
+            kickType       = null;        // clear punt/kick/fg  
+            passMode       = false;       // no slingshot pass  
+            dragging       = false;       // stop any drag line  
+            selectedReceiver = null;      // clear receiver highlight  
+            playActive    = false;       // no play in progress. play has ended.
+            gameSwitchTog = 0; // Prevent turning on again until formation reset
+
+            // 2) Clear the ball object so it’s not still flying
+            ball = null;
+
+            // 3) Reset any UI bits (messages, overlays, etc.)
+            hidePlayOverlay();            // if you’re using the play‑selector popup  
+            hideOverlay();                // clear any “Quarter End” or “TOUCHDOWN” screen  
+            document.getElementById("gameSwitch").checked = false;  
+            //gameSwitch.dispatchEvent(new Event("change"));  
+
+            // 4) Clear dragging state
+            dragStart   = dragCurrent = null;  
+            kickDragStart = kickDragEnd = null;
+
+            // 5) Make sure your debug flags, sounds, etc. are off
+            stopVibratingSound();
+            //clearTimeout(pendingKickTimeoutId); // if you had a delayed punt
+
+            // 6) (Optional) Re‑draw score/downs so nothing is stale
+            updateScores();
+
+            overlayTimer.start(25, () => {
+                showMessage("Delay of Game - 5 yards", 2000);
+                applyPenalty('delayOfGame');
+            });
+
+        }
+
+
+
+
+        // ==========================================PENALTY HELPER
+        function applyPenalty(type) {
+            const p = penalties[type];
+            if (!p) {
+                console.warn('Unknown penalty:', type);
+                return;
+            }
+
+            // 1) Show the flag
+            showMessage(`${p.label} — ${p.yards} yards`, 3000);
+
+            // 2) Move the LOS (note the minus because flipx=1 => moving backwards)
+            lineOfScrimmageX -= p.yards * yardsToPixels * flipx;
+
+            // 3) Advance the down only if flagged
+            if (p.advanceDown) {
+                down++;
+            }
+
+            // 4) Always adjust yardsToFirst
+            yardsToFirst += p.yards;
+
+            // 5) Update UI
+            updateScores();
+
+            // 6) End the play so they reset formation
+            endPlay();
+            }
+
+
+        // ======== OVERLAY FOR PLAYSTATE
+        function drawPlayStateOverlay() {
+            const padding = 10;
+            const boxWidth = 140;
+            const boxHeight = 40;
+
+            ctx.save();
+            ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+            ctx.fillRect(padding, canvas.height - boxHeight - padding, boxWidth, boxHeight);
+
+            ctx.strokeStyle = "white";
+            ctx.strokeRect(padding, canvas.height - boxHeight - padding, boxWidth, boxHeight);
+
+            ctx.fillStyle = "white";
+            ctx.font = "16px sans-serif";
+            ctx.fillText(`Play State: ${playState}`, padding + 10, canvas.height - boxHeight / 2 + 5);
+            ctx.restore();
+        }
+
+
+        // Update updateScores to use team names
+        function updateScores() {
+            const team1ScoreSpan = document.getElementById('team1Score');
+            const team2ScoreSpan = document.getElementById('team2Score');
+            const team1Container = document.querySelector('.team1-score');
+            const team2Container = document.querySelector('.team2-score');
+            team1Container.innerHTML = team1Name + ": <span id='team1Score'>" + team1Score + "</span>";
+            team2Container.innerHTML = team2Name + ": <span id='team2Score'>" + team2Score + "</span>";
+            
+            // Add possession indicator (highlight)
+            if (isTeam1Offense) {
+                team1Container.classList.add("has-ball");
+                team2Container.classList.remove("has-ball");
+            } else {
+                team2Container.classList.add("has-ball");
+                team1Container.classList.remove("has-ball");
+            }
+            document.getElementById('downNum').textContent = down;
+            document.getElementById('yardsNum').textContent = yardsToFirst.toFixed(0);
+            document.getElementById('currentQuarter').textContent = currentQuarter;
+            
+            // Calculate yard line (0-100, adjusted for direction)
+            let yardLineValue = "-";
+            if (lineOfScrimmageX !== null) {
+                const yard = (lineOfScrimmageX - 120) / 12; // Convert pixels to yards (120px = 0 yd line)
+                if (yard <= 50) {
+                yardLineValue = Math.round(yard); // Yards from Washington's end
+                } else {
+                yardLineValue = Math.round(100 - yard); // Yards from Dallas's end
+                }
+            }
+            document.getElementById('yardNum').textContent = yardLineValue;
+            resetPassState();
+            console.log('Scores updated: ' + team1Name + ':', team1Score, team2Name + ':', team2Score);
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawField();
+            if (!formationModeCheckbox.checked && isPlaying) {
+                if (gameSwitch.checked) {
+                //console.log('Play Mode ON, ball carrier at:', team1Players.find(p => p.hasBall)?.x, team1Players.find(p => p.hasBall)?.y);
+                }
+                team1Players.forEach(p => p.update());
+                team2Players.forEach(p => p.update());
+                resolveAllCollisions();
+            }
+            team1Players.forEach(p => p.draw());
+            team2Players.forEach(p => p.draw());
+
+
+            // After drawing all players, draw the enlarged dial overlays for those players that have it.
+            // This ensures that the overlay is always on top.
+            const allPlayers = team1Players.concat(team2Players);
+            allPlayers.forEach(player => {
+                if (player.showLargeDial) {
+                drawLargeDialOverlay(player);
+                }
+            });
+
+            switch (playState) {
+                case "pass":
+                    handleDragLine();
+                    handlePass();
+                    break;
+                case "punt":
+                    handlePunt();
+                    break;
+                case "kickoff":
+                    handlePunt();
+                    // same concept as punt
+                    break;
+                case "fg":
+                    // logic for field goal attempt
+                    break;
+            }
+
+
+            drawBall(); // Draw the ball if it exists
+
+            // Example usage: updating debug info.
+            const debugInfo = {
+            DEBUGINFO: "GAME INFO", version,
+            isTeam1Offense: isTeam1Offense,
+            isRightTeam: isRightTeam,
+            flip: flip,
+            flipx: flipx,
+            ballCarrier: ballCarrier,
+            //ballTeam: ballTeam,
+            yardsToFirst: yardsToFirst,
+            lineOfScrimmageX: lineOfScrimmageX,
+            scoringBoundary : scoringBoundary,
+            quarterTime: quarterTimeRemaining
+
+            };
+            drawPlayStateOverlay();
+            updateDebugOverlay(debugInfo);
+            requestAnimationFrame(updateGame);
+        }
+
+
+        resetFormation(); // Start at 20-yard line (120 + 20 * 12 = 360)
+        updateScores();
+        console.log('Starting game loop');
+        updateGame();
+    };
+    </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xs and Os - Electric Football Retro</title>
+    <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #333;
+        }
+
+        canvas {
+            border: 1px solid #000;
+        }
+
+        #scorebugCanvas {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #messageCanvas {
+            position: absolute;
+            top: 70px;
+            /* Below scorebug */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 720px;
+            height: 100px;
+            border: none;
+            /* Remove border */
+            outline: none;
+            /* Remove outline */
+            display: none;
+            /* Hidden by default */
+        }
+
+        #debugOverlay {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            max-height: 80vh;
+            background: rgba(0, 0, 0, 0.85);
+            color: #FFFFFF;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-y: auto;
+            display: none;
+            /* Hidden by default */
+            z-index: 1000;
+            /* Above canvases */
+        }
+
+        #debugOverlay h3 {
+            margin: 0 0 10px;
+            text-align: center;
+        }
+
+        #debugOverlay pre {
+            margin: 5px 0;
+        }
+
+        #debugOverlay button {
+            display: block;
+            width: 100%;
+            padding: 5px;
+            margin: 5px 0;
+            background: #333;
+            color: #FFF;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        #debugOverlay button:hover {
+            background: #555;
+        }
+
+        #debugToggle {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 5px 10px;
+            background: #333;
+            color: #FFF;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            z-index: 1001;
+        }
+    </style>
+</head>
+
+<body>
+    <button id="debugToggle">Toggle Debug (D)</button>
+    <canvas id="gameCanvas" width="1440" height="800"></canvas>
+    <canvas id="scorebugCanvas"></canvas>
+    <script src="js/sound.js"></script>
+    <script src="js/scorebug.js"></script>
+    <canvas id="messageCanvas"></canvas>
+    <div id="debugOverlay">
+        <h3>Game State Debug</h3>
+        <pre id="debugContent"></pre>
+        <button id="resetButton">Reset Game</button>
+    </div>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
