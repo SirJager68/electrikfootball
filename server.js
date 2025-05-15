@@ -8,11 +8,28 @@ console.log('****************************************')
 console.log('server.js loading...');
 
 // ================= SETUP WEBSOCKET USING type commonjs from package-json
-// ** using commonjs to load modules. set in package json
-const WebSocket = require('ws');
+// ================= SERVER SETUP
+// Setup Express and WebSocket
+const express = require('express');
+const { WebSocketServer } = require('ws');
+const http = require('http');
 const { SpatialGrid, detectAndResolveCollisionRectangles, getRectangleVertices, tackle } = require('./public/js/physics');
 const plays = require('./public/js/plays.js');
-const wss = new WebSocket.Server({ port: 8080 });
+
+// Create Express app
+const app = express();
+app.use(express.static('public')); // Serve static files
+app.get('/', (req, res) => res.sendFile(__dirname + '/index.html'));
+
+// Create HTTP server for Express
+const server = http.createServer(app);
+
+// Setup WebSocket server
+const wss = process.env.NODE_ENV === 'production'
+    ? new WebSocketServer({ server }) // Heroku: Share port with Express
+    : new WebSocketServer({ port: 8080 }); // Local: WebSocket on 8080
+
+// ======================================= END SERVER SEUP
 
 // ======================================= CREATE GAME ID
 // ** create id based on date
