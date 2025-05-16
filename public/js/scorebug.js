@@ -15,10 +15,12 @@ class Scorebug {
             homeTeam: { name: 'DALLS', score: 0, color: '#041E42' },
             awayTeam: { name: 'REDSKINS', score: 0, color: '#7A0019' },
             quarter: 1,
-            gameClock: '10:00', // From clockSeconds
+            gameClock: 0, // From clockSeconds
             playClock: 25, // From playClock
             possession: null, // 'home', 'away', or null
-            isRunning: false
+            isRunning: false,
+            homeTeamScore: 0,
+            awayTeamScore: 0
         };
 
         // Styling
@@ -157,8 +159,11 @@ scorebug.update({
     homeTeam: { name: 'REDSKINS', score: 0, color: '#7A0019' },
     awayTeam: { name: 'DALLAS', score: 0, color: '#041E42' },
     quarter: 1,
-    gameClock: 600, // Initial clockSeconds
+    gameClock: 0, // Initial clockSeconds
     playClock: 25, // Initial playClock
     possession: null,
-    isRunning: false
+    isRunning: false,
+    homeTeamScore: 0,
+    awayTeamScore: 0,
+    down: 1
 });

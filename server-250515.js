@@ -5,36 +5,14 @@ console.log('********* SERVER.JS START   ************')
 console.log('****************************************')
 console.log('** started ', new Date().toLocaleString());
 console.log('****************************************')
-console.log('server.js loading....');
+console.log('server.js loading...');
 
 // ================= SETUP WEBSOCKET USING type commonjs from package-json
-// ================= SERVER SETUP
-// Setup Express and WebSocket
-const express = require('express');
-const { WebSocketServer } = require('ws');
-const http = require('http');
+// ** using commonjs to load modules. set in package json
+const WebSocket = require('ws');
 const { SpatialGrid, detectAndResolveCollisionRectangles, getRectangleVertices, tackle } = require('./public/js/physics');
 const plays = require('./public/js/plays.js');
-
-// Create Express app
-const app = express();
-app.use(express.static('public')); // Serve static files
-app.get('/', (req, res) => res.sendFile(__dirname + '/index.html'));
-app.get('/game.html', (req, res) => res.sendFile(__dirname + '/game.html')); // Serve game.html
-
-// Create HTTP server for Express
-const server = http.createServer(app);
-
-// Setup WebSocket server
-const wss = process.env.NODE_ENV === 'production'
-    ? new WebSocketServer({ server }) // Heroku: Share port with Express
-    : new WebSocketServer({ port: 8080 }); // Local: WebSocket on 8080
-
-const PORT = process.env.NODE_ENV === 'production' ? process.env.PORT : 3001;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || 'development'})`);
-});
-// ======================================= END SERVER SEUP
+const wss = new WebSocket.Server({ port: 8080 });
 
 // ======================================= CREATE GAME ID
 // ** create id based on date
@@ -108,14 +86,13 @@ let rightEndZone = 120; // Right end zone
 let leftEndZone = 20; // Left end zone
 let isTouchDown = false; // Flag for touchdown detection
 let touchdownDetected = false; // Flag for touchdown detection
-let clockDuration = 20;
-let timeExpired = false; // Flag for time expired
+let clockDuration = 10;
 
 // ======================== GAME STATE
 // ** onitial game state setup
 const initialGameState = {
     id: generateGameId(),
-    clock: { s: clockDuration },
+    clock: { s: 12 },
     qtr: 1,
     playclock: 45,
     down: 1,
@@ -130,7 +107,7 @@ const initialGameState = {
     clients: new Set(),
     possession: 'home', // 'home' or 'away'
     offenseDirection: 'right', // initial offensedirection
-    homeTeamName: 'REDSKINS',
+    homeTeamName: 'Redskins',
     awayTeamName: 'DALLAS',
     homeSide: 0, // home team side going right
     awaySide: Math.PI, // away team side going left
@@ -187,7 +164,6 @@ function direction() {
 // ** work from here to build
 const homeTeam = require('./public/js/homeTeam.js');
 const awayTeam = require('./public/js/awayTeam.js');
-const { time } = require('console');
 // =========================================== GET PLAYBOOKS
 // Function to select plays based on possession
 function selectPlays(possession) {
@@ -335,7 +311,6 @@ const initialPlays = selectPlays(game.possession);
 const initialPlayers = generatePlayers(losYardLine, initialPlays.playHome, initialPlays.playAway);
 // Complete game initialization
 game.players = initialPlayers.map(p => ({ ...p }));
-
 // =========================================================== END ADD PLAYERS TO FIELD
 
 
@@ -344,37 +319,15 @@ const grid = new SpatialGrid(20, 140, 80);
 // =============================================== WEBSOCKET
 wss.on('connection', (ws) => {
     game.clients.add(ws);
-    console.log('>>>New client connected');
-    game.clients.forEach(client => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({
-                type: 'playerConnection',
-                message: { text: "Player Connected", type: "info" }
-            }));
-        }
-    });
-    const state = {
+    ws.send(JSON.stringify({
         i: game.id,
-        s: Number((game.clock.s || initialGameState.clock.s).toFixed(2)),
-        p: Number((game.playclock || initialGameState.playclock).toFixed(1)),
+        s: Number((game.clock.s || 600).toFixed(2)),
+        p: Number(game.playclock.toFixed(1)),
         r: game.gameRunning,
-        los: game.losYardLine,
-        fdl: game.firstDownYardLine,
-        pl: game.players,
-        qtr: game.qtr,
-        down: game.down,
-        ytg: Number(game.yardsToGo.toFixed(2)),
-        poss: game.possession,
-        homeScore: game.homeScore,
-        awayScore: game.awayScore,
-        playState: game.playState,
-        homeTD: game.homeTD,
-        awayTD: game.awayTD,
-        gameStart: game.gameStart,
-        message: message,
-    };
-    ws.send(JSON.stringify(state));
-    console.log('Sent initial state to new client:', state);
+        //los: losYardLine,
+        //fdl: firstDownYardLine,
+        pl: game.players
+    }));
     ws.on('message', (msg) => {
         const data = JSON.parse(msg);
         // ========================================== GAME SWITCH ON/OFF BROADCAST
@@ -522,7 +475,6 @@ setInterval(() => { // ============== handling the clock
     if (game.clockRunning) {
         broadcastClockUpdate(game);
         if (game.clock.s <= 0 && !game.gameRunning) {
-            game.clockRunning.s = 0;
             clockLogic();
         }
     }
@@ -596,26 +548,19 @@ function gameover() {
 // Reset game state to initial values
 function restartGame() {
     // Preserve clients to maintain WebSocket connections
-    console.log('>>>>>>Game Restart Key - Q');
-    game.playState = 'kickoff';
     const { clients } = game;
     Object.assign(game, {
         ...initialGameState,
         id: generateGameId(), // New ID for reset
-        clients: clients,
-        clock: { ...initialGameState.clock } // Keep existing connections
+        clients: clients // Keep existing connections
     });
-    game.clock.s = clockDuration; // Reset clock
-    game.homeScore = 0;
-    game.awayScore = 0;
     //game.losYardLine = 60;
     //game.firstDownYardLine = losYardLine + 10;
-    //game.playState = 'kickoff';
+    game.playState = 'kickoff';
     const plays = selectPlays(game.possession);
     game.players = generatePlayers(losYardLine, plays.playHome, plays.playAway).map(p => ({ ...p }));
-    console.log('>>>>>>Game reset to initial state');
-    broadcastReset(game, { text: "New Game Started!", type: "info" });
-    broadcastClockUpdate(game);
+    console.log('Game reset to initial state');
+    broadcastState(game, { text: "New Game Started!", type: "info" });
 }
 // =================================================== END THE CLOCK
 
@@ -629,7 +574,7 @@ function getFrontEdgeX(player, playState) {
     let direction = Math.cos(player.heading); // > 0 for right, < 0 for left
     // Flip direction for kickoff or punt
     if (playState === 'kickoff' || playState === 'punt') {
-        direction = direction;
+        direction = -direction;
     }
     if (direction > 0) {
         const maxX = Math.max(...vertices.map(v => v.x));
@@ -668,7 +613,7 @@ function updatePhysics(game) {
 
         // Check touchdown for ball carrier
         if (p.hb && !isTouchDown) {
-            const team = p.pid.startsWith(game.id + "-h") ? 'home' : 'away';
+            const team = p.pid.startsWith('abcdef-h') ? 'home' : 'away';
             const dir = direction(team);
             if ((game.homeTD === rightEndZone && game.possession === 'home' && p.x >= 120) ||
                 (game.homeTD === leftEndZone && game.possession === 'home' && p.x <= 20) ||
@@ -704,18 +649,11 @@ function updatePhysics(game) {
                 isTouchDown = false; // Reset touchdown flag
                 if (game.clock.s <= 0) {
                     console.log('>>>>>>>>>>>>>>QTR over! Time expired.');
-                    //clockLogic();
-                    timeExpired = true;
-                    game.clock.s = 0;
+                    clockLogic();
                 }
                 // Broadcast touchdown
                 broadcastReset(game, message);
                 game.playState = 'kickoff'; // Reset play state
-                game.currentPlay = 'end';
-                if (timeExpired) {
-                    clockLogic();
-                    timeExpired = false;
-                }
                 const plays = selectPlays(game.possession);
                 game.players = generatePlayers(game.losYardLine, plays.playHome, plays.playAway).map(p => ({ ...p }));
                 console.log(`Touchdown! ${team} scores, new score: Home ${game.homeScore} - Away ${game.awayScore}, New LOS: ${losYardLine}, fdl: ${game.firstDownYardLine.toFixed(2)}`);
@@ -883,8 +821,7 @@ function broadcastReset(game, message, firstDownYardLine, down, yardsToGo, qtr,)
         homeTD: game.homeTD,
         awayTD: game.awayTD,
         gameStart: game.gameStart,
-        currentPlay: game.currentPlay,
-        s: Number((game.clock.s).toFixed(2)),
+        s: Number((game.clock.s || 600).toFixed(2)),
         p: Number(game.playclock.toFixed(0)),
         pl: game.players.map(p => ({
             pid: p.pid,
@@ -912,7 +849,7 @@ function broadcastClockUpdate(game) {
         }
         const payload = {
             type: 'clockUpdate',
-            s: Number((game.clock.s || 0).toFixed(1)),
+            s: Number((game.clock.s || 600).toFixed(1)),
             p: Number((game.playclock || 25).toFixed(0)),
             r: game.running
         };

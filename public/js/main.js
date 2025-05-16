@@ -91,6 +91,9 @@ let gameState = {
     gameStart: false,
     gameState: 'unknown',
     currentPlay: null,
+    homeScore: 0,
+    awayScore: 0,
+    currentPlay: null,
 };
 
 // const scorebug = new Scorebug('scorebugCanvas', {
@@ -269,6 +272,7 @@ Down: ${state.down || 1}
 Yards to Go: ${state.yardsToGo || 10}
 Play State: ${state.playState || 'unknown'}
 Game Running: ${state.gameRunning || false}
+Current PLay : ${state.currentPlay || 'unknown'}    
 Clock Running: ${state.clockRunning || false}
 Play Clock Running: ${state.playClockRunning || false}
 Game Started: ${state.gameStart || 'unknown'}
@@ -432,8 +436,13 @@ ws.onmessage = (msg) => {
                 gameState.playState = data.playState;
                 if (gameState.playState === 'touchdown') {
                     tdCrowd.play(); // play crowd noise
+                    gameState.currentPlay = 'end';
                 }
                 console.log(`Updated play state: playState=${gameState.playState}`);
+            }
+            if (data.currentPlay) {
+                gameState.currentPlay = data.currentPlay;
+                console.log(`Updated current play: currentPlay=${gameState.currentPlay}`);
             }
             if (data.homeTD !== undefined) {
                 gameState.homeTD = data.homeTD;
@@ -458,18 +467,66 @@ ws.onmessage = (msg) => {
             render();
             //}
         } else {
+            // console.log('Received full state:', data);
+            // const {
+            //     i: serverId,
+            //     s: serverClock,
+            //     p: serverPlayClock,
+            //     r: serverRunning,
+            //     pl: serverPlayers,
+            //     qtr: serverQtr,
+            //     down: serverDown,
+            //     ytg: serverYardsToGo,
+            //     poss: serverPossession,
+            //     los: serverLos,
+            //     fdl: serverFdl,
+            //     homeScore: serverHomeScore,
+            //     awayScore: serverAwayScore,
+            //     playState: serverPlayState,
+            //     homeTD: serverHomeTD,
+            //     awayTD: serverAwayTD,
+            //     gameStart: serverGameStart
+            // } = data;
+            // gameState.id = serverId !== undefined ? serverId : gameState.id;
+            // gameState.gameRunning = serverRunning !== undefined ? serverRunning : gameState.gameRunning;
+            // gameState.players = serverPlayers !== undefined ? serverPlayers : gameState.players;
+            // gameState.gameClock = serverClock !== undefined ? serverClock : gameState.gameClock;
+            // gameState.playClock = serverPlayClock !== undefined ? serverPlayClock : gameState.playClock;
+            // gameState.qtr = serverQtr !== undefined ? serverQtr : gameState.qtr;
+            // gameState.down = serverDown !== undefined ? serverDown : gameState.down;
+            // gameState.yardsToGo = serverYardsToGo !== undefined ? Math.round(serverYardsToGo) : gameState.yardsToGo;
+            // gameState.possession = serverPossession !== undefined ? serverPossession : gameState.possession;
+            // gameState.los = serverLos !== undefined ? serverLos : gameState.los;
+            // gameState.firstDownLine = serverFdl !== undefined ? serverFdl : gameState.firstDownLine;
+            // gameState.homeTeam.score = serverHomeScore !== undefined ? serverHomeScore : gameState.homeTeam.score;
+            // gameState.awayTeam.score = serverAwayScore !== undefined ? serverAwayScore : gameState.awayTeam.score;
+            // gameState.playState = serverPlayState !== undefined ? serverPlayState : gameState.playState;
+            // gameState.homeTD = serverHomeTD !== undefined ? serverHomeTD : gameState.homeTD;
+            // gameState.awayTD = serverAwayTD !== undefined ? serverAwayTD : gameState.awayTD;
+            // gameState.gameStart = serverGameStart !== undefined ? serverGameStart : gameState.gameStart;
+            // // Update UI
+            // scorebug.update(gameState);
+            // debugScreen.update(gameState, gameState.players);
+            // fieldDirty = true;
+            // render();
+
+
+            //== INITIAL
             const { s, p, r: serverRunning, pl: serverPlayers } = data;
             gameRunning = serverRunning !== undefined ? serverRunning : gameRunning;
             players = serverPlayers || players;
             clockSeconds = s !== undefined ? s : clockSeconds;
             playClock = p !== undefined ? p : playClock;
+            //console.log('Received full state:');
             //console.log('>>> else Received full state:', JSON.stringify(data));
             //console.log(players.map(p => `${p.pid}: x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}, h=${p.h.toFixed(2)}`));
+            //== END INITIAL
 
             // ============================================ TOGGLE VIBRATE SOUND ON/OFF
             if (gameRunning && !vibrateSound) { // ========TOGGLE SOUND ON/OFF
                 startVibratingSound();
                 vibrateSound = true;
+                gameState.currentPlay = 'running';
             } else if (!gameRunning && vibrateSound) {
                 stopVibratingSound();
                 vibrateSound = false;
@@ -514,7 +571,7 @@ document.addEventListener('keydown', (e) => {
         console.log('>>>Space key pressed');
         gameState.currentPlay = 'running';
         ws.send(JSON.stringify({ type: 'toggleGame', gameID }));
-    } else if (e.code === 'KeyR') {
+    } else if (e.code === 'KeyR' && gameState.currentPlay !== 'running') {
         ws.send(JSON.stringify({ type: 'reset', gameID }));
     } else if (e.code === 'KeyQ') {
         ws.send(JSON.stringify({ type: 'restart', gameID }));
@@ -718,7 +775,7 @@ function drawLargeDialOverlay(player) {
 
 // =======================================DRAW A FOOTBALL FIELD
 function drawField() {
-    console.log('Drawing field... drawField()');
+    //console.log('Drawing field... drawField()');
     fieldCtx.clearRect(0, 0, fieldCanvas.width, fieldCanvas.height);
     fieldCtx.save();
     fieldCtx.translate(fieldCanvas.width / 2, fieldCanvas.height / 2);
@@ -883,7 +940,7 @@ function drawField() {
 
     // ====== DRAW LOS AND OTHER MARKERS
     // ===DRAW LINE OF SCRIMMAGE LOS
-    console.log('gameState.los', gameState.los);
+    //console.log('gameState.los', gameState.los);
     if (gameState.los !== null) {
         fieldCtx.strokeStyle = "black";
         fieldCtx.globalAlpha = 0.7;
