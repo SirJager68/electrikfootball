@@ -119,6 +119,7 @@ const initialGameState = {
     qtr: 1,
     playclock: 45,
     down: 1,
+    ball: null,
     losYardLine: 85,
     firstDownYardLine: 70,
     yardsToGo: 10,
@@ -145,43 +146,6 @@ const initialGameState = {
 // ** clock will be setup in a setup screen
 const game = { ...initialGameState, clients: new Set() };
 console.log(`Game initialized with ID: ${game.id}`);
-// const game = {
-//     id: 'abcdef',
-//     clock: { s: clockDuration },
-//     qtr: 1,
-//     playclock: 40,
-//     down: 1,
-//     losYardLine: 85,
-//     firstDownYardLine: 70,
-//     yardsToGo: 10,
-//     gameRunning: false,
-//     clockRunning: false,
-//     playClockRunning: false,
-//     playState: 'kickoff', // normal, kickoff, punt
-//     clients: new Set(),
-//     possession: 'home', // 'home' or 'away'
-//     offenseDirection: 'right', // initial offensedirection
-//     homeTeamName: 'Redskins',
-//     awayTeamName: 'DALLAS',
-//     homeSide: 0, // home team side going right
-//     awaySide: Math.PI, // away team side going left
-//     homeTD: rightEndZone,
-//     awayTD: leftEndZone,
-//     losDirection: 1, // 1 for right, -1 for left
-//     homeScore: 0,
-//     awayScore: 0,
-//     gameStart: false,
-// };
-let losDirection = -1; // 1 for right, -1 for left
-function direction() {
-    if (game.possession === 'home' && game.offenseDirection === 'right') {
-        losDirection = 1; // Home team is on the left going right
-        homeSide = 1; //swap heading
-    } else if (game.possession === 'home' && game.offenseDirection === 'left') {
-        losDirection = -1; // Home team is on the right
-        homeSide = -1;
-    }
-}
 
 // ======================================================= GET ROSTERS
 // ** work from here to build
@@ -211,12 +175,7 @@ function selectPlays(possession) {
         }
         console.log('plays' + playHome)
     }
-    // if (!offensivePlays["I-Formation"]) {
-    //     console.log('Using hardcoded I-Formation due to import failure or missing I-Formation');
-    // }
-    // if (!defensivePlays["4-3-Standard"]) {
-    //     console.log('Using hardcoded 4-3-Standard due to import failure or missing 4-3-Standard');
-    // }
+
     // figure out direction and heading of teams based on possession
     if (game.possession === 'home' && game.homeSide === 0) {
         game.losDirection = 1; // Home team is on the left going right
@@ -308,8 +267,6 @@ function generatePlayers(losYardLine, playHome, playAway) {
             // Convert relative to absolute coordinates
             const x = playPosHA ? Math.max(10, Math.min(130, game.losYardLine + xSign * playPosHA.x)) : 65;
             const y = playPosHA ? Math.max(8.5, Math.min(71.5, midlineY + playPosHA.y * (PLAYABLE_WIDTH / 360))) : 20 + i * 4;
-            // const x = playPosHA ? Math.max(10, Math.min(130, losYardLine + playPosHA.x)) : 65;
-            // const y = playPosHA ? Math.max(8.5, Math.min(71.5, midlineY + playPosHA.y * (PLAYABLE_WIDTH / 360))) : 20 + i * 4;
             return {
                 pid: `${game.id}-a-${id}`,
                 name: isAwayOffense ? awayTeam.rosterOffense[i] : awayTeam.rosterDefense[i],
@@ -664,12 +621,12 @@ function updatePhysics(game) {
         const maxTurnRate = 0.02;
         const dialSteering = ((p.dialValue - 50) / 50) * maxTurnRate;
         p.heading += dialSteering * (1 / TICK_RATE);
-        // =============================================== CHECK FOR TOUCHDOWN
 
+        // =============================================== CHECK FOR TOUCHDOWN
         // Check touchdown for ball carrier
         if (p.hb && !isTouchDown) {
             const team = p.pid.startsWith(game.id + "-h") ? 'home' : 'away';
-            const dir = direction(team);
+            // const dir = direction(team);
             if ((game.homeTD === rightEndZone && game.possession === 'home' && p.x >= 120) ||
                 (game.homeTD === leftEndZone && game.possession === 'home' && p.x <= 20) ||
                 (game.awayTD === rightEndZone && game.possession === 'away' && p.x >= 120) ||
@@ -693,11 +650,8 @@ function updatePhysics(game) {
                     game.losYardLine = 85; // Kickoff from 35-yard line
                     game.firstDownYardLine = game.losYardLine - (10 * game.losDirection); // Move first down marker
                 }
-                //game.losYardLine = 100; // Kickoff from 35-yard line
                 game.possession = team === 'home' ? 'away' : 'home'; // Opponent receives
                 game.playState = 'touchdown';
-                // const plays = selectPlays(game.possession);
-                // game.players = generatePlayers(game.losYardLine, plays.playHome, plays.playAway).map(p => ({ ...p }));
                 game.gameRunning = false;
                 game.clockRunning = false;
                 game.playClockRunning = false;
@@ -744,7 +698,7 @@ function updatePhysics(game) {
     });
 
 
-    // == Collision detection with tackling
+    // =================================================== Collision detection with tackling
     for (const p of game.players) {
         const nearby = grid.getNearbyPlayers(p);
         for (const other of nearby) {
