@@ -999,7 +999,69 @@ function strokeRoundedRect(ctx, x, y, width, height, radius) {
     ctx.stroke();
 }
 
-function renderGame() {
+function renderRunning() {
+    const startTime = performance.now();
+    if (fieldDirty) {
+        drawField();
+        fieldDirty = false;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(fieldCanvas, 0, 0);
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-yardsToPixels(FIELD_WIDTH / 2) + panX / zoom, -yardsToPixels(FIELD_HEIGHT / 2) + panY / zoom);
+    players.forEach(p => {
+        //=========== draw base
+        ctx.save();
+        ctx.translate(yardsToPixels(p.x), yardsToPixels(FIELD_HEIGHT - p.y));
+        ctx.rotate(-p.h);
+        ctx.fillStyle = p.pid.includes('-h-') ? 'blue' : 'red';
+        ctx.lineWidth = yardsToPixels(0.1);
+        ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
+        const image = p.pid.includes('-h-') ? homeImage : awayImage;
+        if (image.complete) {
+            ctx.drawImage(image, -yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
+        }
+        // ctx.fillStyle = 'white'; // direction dot for debugging
+        // ctx.beginPath();
+        // ctx.arc(yardsToPixels(3 / 2), 0, yardsToPixels(0.2), 0, 2 * Math.PI);
+        // ctx.fill();
+        // ctx.fillStyle = 'green';
+        // ctx.beginPath();
+        // ctx.arc(0, 0, yardsToPixels(0.2), 0, 2 * Math.PI);
+        // ctx.fill();
+        ctx.strokeStyle = 'yellow';
+        ctx.lineWidth = yardsToPixels(0.1);
+        ctx.beginPath();
+        const steeringAngle = ((p.dv - 50) / 50) * 0.2;
+        ctx.arc(0, 0, yardsToPixels(0.5), -steeringAngle - Math.PI / 4, -steeringAngle + Math.PI / 4);
+        ctx.stroke();
+        ctx.restore();
+    });
+
+    const endTime = performance.now();
+    renderTimes.push(endTime - startTime);
+    if (renderTimes.length > 60) renderTimes.shift();
+    const avgRenderTime = renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length;
+    frameCount++;
+    const now = performance.now();
+    if (now - lastFrameTime >= 1000) {
+        fps = frameCount * 1000 / (now - lastFrameTime);
+        frameCount = 0;
+        lastFrameTime = now;
+    }
+
+    // ctx.fillStyle = 'white';
+    // ctx.font = `${yardsToPixels(baseHeight)}px Arial`;
+    // ctx.fillText(formatClock(clockSeconds), yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 13));
+    // ctx.fillText(formatClock(playClock), yardsToPixels(25), yardsToPixels(FIELD_HEIGHT - 13));
+    // ctx.fillText(`FPS: ${fps.toFixed(1)} Render: ${avgRenderTime.toFixed(2)}ms Data: ${(bytesSent / 1024).toFixed(2)}KB sent, ${(bytesReceived / 1024).toFixed(2)}KB received, ${lastMessageBytes.toFixed(2)}KB/tick`, yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 9));
+    // ctx.fillText(`Game: ${gameRunning ? 'Running' : 'Paused'} Zoom: ${zoom.toFixed(1)}`, yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 5));
+    ctx.restore();
+}
+
+function renderStopped() {
     //console.log('Rendering stopped... renderStopped()');
     const startTime = performance.now();
     if (fieldDirty) {
@@ -1074,8 +1136,6 @@ function renderGame() {
         // ctx.textAlign = 'left';
     });
 
-
-    // ===================================== SHOW MEASURMENTS
     const endTime = performance.now();
     renderTimes.push(endTime - startTime);
     if (renderTimes.length > 60) renderTimes.shift();
@@ -1105,9 +1165,11 @@ function renderGame() {
 // =============================== RENDER FOR GAME RUNNING OR GAME STOPPED
 function render() {
     if (gameRunning) {
-        renderGame();
+        renderStopped();
     } else {
-        renderGame();
+        renderStopped();
         messageCanvas.render();
     }
 }
+
+// Merge with your zoom, drag/rotate logic

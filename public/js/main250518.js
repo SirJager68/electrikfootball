@@ -15,7 +15,7 @@ const ws = new WebSocket('ws://localhost:8080');
 const gameID = 'abcdef';
 let players = [];
 let gameRunning = false;
-let clockSeconds = 600; // Default until server update
+let clockSeconds = 0; // Default until server update
 let playClock = 25; // Default until server update
 
 // ==================== FIELD DIMESIONS
@@ -50,8 +50,24 @@ let dragOffsetY = 0;
 let mx = 0; // Add global mouse coordinates
 let my = 0;
 
+// ====================================SOME RULES
+// ** probably move these to the server
+let offPlaySTop = 3;
+let offPivot = 0; // Offset from pivot point   
+let defPivot = 0; // Offset from pivot point
+let offPivotTrigger = 1; // trigger to keep pivot from incrementing on mousewheel
+
 let lastHoverCheck = 0;
 const HOVER_CHECK_INTERVAL = 100;
+
+// Pass-related state
+let passMode = false;
+let isDraggingBand = false;
+let dragStart = null;
+let dragCurrent = null;
+let selectedReceiver = null;
+let isEligible = false;
+let isBallThrown = false;
 
 // ========================================== PLAYER STUFF
 // ** MOVE TO SERVER AND GET INITIAL LOAD
@@ -78,6 +94,7 @@ awayImage.src = 'images/ef-g-saints.png';
 // ========================================= END PLAYER STUFF
 
 let gameState = {
+    id: gameID,
     homeTeam: { name: homeTeamName, score: 0, color: homeEndZoneColor },
     awayTeam: { name: awayTeamName, score: 0, color: awayEndZoneColor },
     homeTeamColor: '#f00',
@@ -95,7 +112,10 @@ let gameState = {
     currentPlay: null,
     homeScore: 0,
     awayScore: 0,
-    currentPlay: null,
+    ball: null,
+    ballCarrier: null,
+    dragStart: null,
+    dragCurrent: null,  
 };
 
 // const scorebug = new Scorebug('scorebugCanvas', {
@@ -151,8 +171,10 @@ function formatClock(seconds) {
     return `Clock: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-// ============================= MESSAGE SYSTEM
+// ======================================================= MESSAGE SYSTEM
 // MessageCanvas class to manage and render messages on a separate canvas
+// ** This is the message system for the game
+// ======================================================================
 class MessageCanvas {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -260,6 +282,7 @@ class DebugScreen {
     update(state, players) {
         if (!this.content) return;
         const debugText = `
+gameID: ${state.gameID || 'N/A'}
 Possession: ${state.possession || 'N/A'}
 Home Side: ${(state.homeSide || 0).toFixed(2)} (${state.homeSide === 0 ? 'Right' : 'Left'})
 Away Side: ${(state.awaySide || Math.PI).toFixed(2)} (${state.awaySide === 0 ? 'Right' : 'Left'})
@@ -273,6 +296,7 @@ Away Score: ${state.awayScore || 0}
 Down: ${state.down || 1}
 Yards to Go: ${state.yardsToGo || 10}
 Play State: ${state.playState || 'unknown'}
+Game State: ${gameState.gameState || 'unknown'}
 Game Running: ${state.gameRunning || false}
 Current PLay : ${state.currentPlay || 'unknown'}    
 Clock Running: ${state.clockRunning || false}
@@ -280,6 +304,11 @@ Play Clock Running: ${state.playClockRunning || false}
 Game Started: ${state.gameStart || 'unknown'}
 Home TD: ${state.homeTD || 'unknown'}
 Away TD: ${state.awayTD || 'unknown'}
+Passmode: ${passMode ? 'ON' : 'OFF'}
+DragStart: ${state.dragStart ? `(${state.dragStart.x.toFixed(2)}, ${state.dragStart.y.toFixed(2)})` : 'N/A'}
+DragCurrent: ${state.dragCurrent ? `(${state.dragCurrent.x.toFixed(2)}, ${state.dragCurrent.y.toFixed(2)})` : 'N/A'}
+OffPivot: ${offPivot};
+gameState.ball = serverBall !== undefined ? serverBall : gameState.ball;
 Ball Carrier: ${players.find(p => p.hb)?.pid || 'None'} (x=${players.find(p => p.hb)?.x?.toFixed(2) || 'N/A'}, y=${players.find(p => p.hb)?.y?.toFixed(2) || 'N/A'})
         `;
         this.content.textContent = debugText;
@@ -317,6 +346,7 @@ ws.onmessage = (msg) => {
                 player.d = data.d;
                 player.dc = data.dc;
                 player.hb = data.hb;
+                //player.isEligible = true;
                 //player.hb = data.hb;
                 //console.log(`Received player update: ${data.pid}, x=${data.x}, y=${data.y}`);
             }
@@ -386,8 +416,13 @@ ws.onmessage = (msg) => {
             //**
             // =============================================================================
         } else if (data.type === 'reset') {
+            passMode = false;
             players = data.pl.filter(p => p && p.pid);
             console.log('Reset event');
+            if (data.i !== undefined) {
+                gameState.gameID = data.i;
+                console.log(`Game ID: gameID=${gameState.id}`);
+            }
             if (data.los !== undefined) {
                 gameState.los = data.los;
                 console.log(`Updated LOS: losYardLine=${gameState.los}`);
@@ -519,6 +554,7 @@ ws.onmessage = (msg) => {
             players = serverPlayers || players;
             clockSeconds = s !== undefined ? s : clockSeconds;
             playClock = p !== undefined ? p : playClock;
+            gameState.players = players;
             //console.log('Received full state:');
             //console.log('>>> else Received full state:', JSON.stringify(data));
             //console.log(players.map(p => `${p.pid}: x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}, h=${p.h.toFixed(2)}`));
@@ -568,15 +604,74 @@ ws.send = (data) => {
 // ** send toggle to server.js to get things going
 // =================================================
 document.addEventListener('keydown', (e) => {
+    // ============================================== MOUSE DOWN
+    // *************************
+    // ============================================== GAME SWITCH On/OFF Spacebar
     if (e.code === 'Space' && gameState.playState !== 'gameover') {
         e.preventDefault();
         console.log('>>>Space key pressed');
         gameState.currentPlay = 'running';
+        offPivot = 0;
+        defPivot = 0;
+        passMode = false;
         ws.send(JSON.stringify({ type: 'toggleGame', gameID }));
+        // ============================================== END GAME SWITCH ON/OFF
     } else if (e.code === 'KeyR' && gameState.currentPlay !== 'running') {
         ws.send(JSON.stringify({ type: 'reset', gameID }));
     } else if (e.code === 'KeyQ') {
         ws.send(JSON.stringify({ type: 'restart', gameID }));
+    }
+});
+
+// ======================================================= PASS MODE EVENT SWITCH
+document.addEventListener('keydown', (e) => {
+    // if (e.key.toLowerCase() === 'p' && !gameState.gameRunning && gameState.gameStart) {
+    if (e.key.toLowerCase() === 'p' && gameState.isRunning && passMode === false) {
+        const QB = gameState.players.find(p => p.hb);
+        if (!QB) {
+            messageCanvas.addMessage("No ball carrier found", "error");
+            return;
+        }
+        // ==Check if QB is behind LOS
+        const isBehindLOS = (gameState.possession === 'home' && gameState.homeTD === 120 && QB.x < gameState.los - 2.1) ||
+            (gameState.possession === 'home' && gameState.homeTD === 20 && QB.x > gameState.los + 2.1) ||
+            (gameState.possession === 'away' && gameState.awayTD === 120 && QB.x < gameState.los - 2.1) ||
+            (gameState.possession === 'away' && gameState.awayTD === 20 && QB.x > gameState.los + 2.1);
+        if (isBehindLOS) {
+            passMode = true;
+            selectedReceiver = null;
+            gameState.dragStart = { x: QB.x, y: QB.y };
+            gameState.dragCurrent = getMouseYardCoords(mx, my);
+            gameState.gameState = "passActivated";
+            messageCanvas.addMessage("Pass Mode", "info");
+            console.log('Pass mode enabled, eligible receivers marked');
+            console.log('gameState.dragStart:', gameState.dragStart.x , gameState.dragStart.y);
+        } else {
+            messageCanvas.addMessage("QB must be behind line of scrimmage", "error");
+        }
+        fieldDirty = true;
+        debugScreen.update(gameState, gameState.players);
+        render();
+        const passData = {
+            x: gameState.dragStart.x,
+            y: gameState.dragStart.y, 
+        };
+        ws.send(JSON.stringify({ type: 'startpass', passData, gameID }));
+        console.log ('Pass data sent to server:', passData);
+    } else if (e.key.toLowerCase() === 'p') {
+        console.log('Pass mode disabled');
+        passMode = false;
+        gameState.dragStart = null;
+        gameState.dragCurrent = null;
+        selectedReceiver = null;
+        gameState.players.forEach(p => {
+            p.selected = false;
+            p.isEligible = false;
+        });
+        console.log('Pass mode disabled');
+        fieldDirty = true;
+        debugScreen.update(gameState, gameState.players);
+        render();
     }
 });
 // ====================================== END GAME SWITCH
@@ -612,7 +707,9 @@ function isMouseHoverPlayer(mx, my, p) {
 }
 
 
-// ===================================== Add ZOOM with mouse wheel
+// ===================================== MOUSE WHEEL EVENTS
+// ** zoom in and out
+// ** rotate player
 canvas.addEventListener('wheel', (e) => {
     if (isDraggingPlayer && selectedPlayer) {
         selectedPlayer.h += e.deltaY * 0.001;
@@ -625,6 +722,14 @@ canvas.addEventListener('wheel', (e) => {
             y: selectedPlayer.y,
             h: selectedPlayer.h
         }));
+
+        if (offPivotTrigger === 1) {
+            offPivot += 1;
+            offPivotTrigger = 0;
+        }
+
+        console.log('offPivot:', offPivot);
+        debugScreen.update(gameState, gameState.players, offPivot);
     } else {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP; // Scroll down: zoom out, up: zoom in
@@ -640,11 +745,14 @@ canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
     mx = e.clientX - rect.left;
     my = e.clientY - rect.top;
-    // Use hoveredPlayer.i if valid, otherwise check all players
+    // === Use hoveredPlayer.i if valid, otherwise check all players
+
     selectedPlayer = hoveredPlayer && isMouseHoverPlayer(mx, my, hoveredPlayer) ?
         players.find(p => p.pid === hoveredPlayer.pid) :
         players.find(p => isMouseHoverPlayer(mx, my, p));
-    //console.log(`Selected player: ${selectedPlayer ? selectedPlayer.pid : 'none'}`);
+        //console.log(`Selected player: ${selectedPlayer ? selectedPlayer.pid : 'none'}`);
+
+    // =================== 
     if (selectedPlayer && !gameRunning) {
         if (e.button === 2) {    // == right click
 
@@ -653,26 +761,33 @@ canvas.addEventListener('mousedown', (e) => {
             isDraggingPlayer = true;
             isRotatePlayer = true;
         }
+    } else if (e.button === 0 && passMode) {
+        isDraggingBand = true;
+        console.log('Pass Band activated');
     } else {
         isDraggingField = true;
         lastMouseX = mx;
         lastMouseY = my;
     }
 
-    if ( e.button ===1) {
+    // =================== DRAG THE FIELD AROUND
+    if (e.button === 1) {
         zoom = 1;
-        panX = 0;  
+        panX = 0;
         panY = 0;
         fieldDirty = true;
         render();
     }
 });
 
+// ============================================= MOUSE MOVE
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     mx = e.clientX - rect.left;
     my = e.clientY - rect.top;
     const now = performance.now();
+    // ======= HIGHLIGHT PLAYER ON  MOUSEOVER - 
+    // ***see draw player highlight
     if (!gameRunning && now - lastHoverCheck >= HOVER_CHECK_INTERVAL) {
         hoveredPlayer = players.find(p => isMouseHoverPlayer(mx, my, p)) || null;
         //console.log(`Hovered player: ${hoveredPlayer ? hoveredPlayer.pid : 'none'}`);
@@ -689,9 +804,12 @@ canvas.addEventListener('mousemove', (e) => {
             dialValue: selectedPlayer.d
         }));
         lastMouseX = mx;
+
+        // ========================== DRAG A PLAYER AROUND
+        // ** draw a player if a play is not running
+        // ** currentplay - running... this will stop with a tackle
     } else if (isDraggingPlayer && selectedPlayer && gameState.currentPlay !== 'running') {
         const { x: yardX, y: yardY } = getMouseYardCoords(mx, my);
-        //console.log(`Dragging player: ${selectedPlayer.pid} to (${yardX.toFixed(2)}, ${yardY.toFixed(2)})`);
         selectedPlayer.x = Math.max(3, Math.min(135, yardX));
         selectedPlayer.y = Math.max(3, Math.min(77, yardY));
         ws.send(JSON.stringify({ // send to server to broadcast to all clients
@@ -702,6 +820,8 @@ canvas.addEventListener('mousemove', (e) => {
             y: selectedPlayer.y,
             //h: selectedPlayer.h
         }));
+        // ============================ DRAG THE FIELD
+        // ** if no player selected drag the field around
     } else if (isDraggingField) {
         const dx = mx - lastMouseX;
         const dy = my - lastMouseY;
@@ -710,15 +830,98 @@ canvas.addEventListener('mousemove', (e) => {
         lastMouseX = mx;
         lastMouseY = my;
         fieldDirty = true;
+        //if (gameStarted) render();
+    } else if (passMode && gameState.dragStart) {
+        gameState.dragCurrent = getMouseYardCoords(mx, my);
+        //console.log(`Dragging pass target to (${gameState.dragCurrent.x.toFixed(2)}, ${gameState.dragCurrent.y.toFixed(2)})`);
     }
+    // ========================================= FIX?????
+    // ** draws the field as you move the mouse. probably not necessary
     if (gameStarted) render();
 });
 
+// ============================================== MOUSE UP EVENTS
 canvas.addEventListener('mouseup', () => {
+    if (passMode) {
+        if (!gameState.dragStart || !gameState.dragCurrent) {
+            console.warn('Cannot initiate pass: Missing dragStart or dragCurrent');
+            gameState.passMode = false;
+            isDraggingField = false;
+            isDraggingPlayer = false;
+            isAdjustingDial = false;
+            selectedPlayer = null;
+            return;
+        }
+
+        // Find ball carrier (assuming p.hb is hasBall)
+        const ballCarrier = players.find(p => p.hb);
+        if (!ballCarrier) {
+            console.warn('No ball carrier found for pass');
+            gameState.passMode = false;
+            return;
+        }
+
+        // Compute angle and power
+        const dx = gameState.dragStart.x - gameState.dragCurrent.x;
+        const dy = gameState.dragStart.y - gameState.dragCurrent.y;
+        const angle = Math.atan2(dy, dx);
+        const power = Math.min(Math.hypot(dx, dy), 200) * 0.15; // Max 30
+        const speed = power / 20; // Adjust divisor for game scale (e.g., 10 for faster)
+
+        // Send pass data to server
+        const passData = {
+            x: gameState.dragStart.x,
+            y: gameState.dragStart.y,
+            vx: -speed * Math.cos(angle),
+            vy: -speed * Math.sin(angle),
+            //selectedReceiver: gameState.selectedReceiver // If set
+        };
+        ws.send(JSON.stringify({ type: 'passThrown', data: passData }));
+        console.log('Client: Sent pass data:', passData);
+
+        // // Set ball properties
+        // gameState.ball = {
+        //     x: gameState.dragStart.x,
+        //     y: gameState.dragStart.y,
+        //     vx: -speed * Math.cos(angle), // Negative to point toward dragCurrent
+        //     vy: -speed * Math.sin(angle), // Negative, gravity applied later
+        //     isMoving: true,
+        //     rotation: 0,
+        //     trail: []
+        // };
+
+        // Clear ball possession
+        ballCarrier.hb = false;
+        console.log('Ball thrown: angle=', angle, 'power=', power, 'ball=', gameState.ball);
+
+        // Exit passMode and reset state
+        gameState.playState = 'passThrown'
+        gameState.passMode = false;
+        gameState.dragStart = null;
+        gameState.dragCurrent = null;
+        isDraggingBand = false;
+        isBallThrown = true;
+        ws.send(JSON.stringify({ type: 'passThrown', gameID, }));
+
+        // Reset player states (aligning with your code)
+        players.forEach(p => {
+            p.selected = false;
+            p.isEligible = false;
+        });
+
+        // Trigger game state change (if needed)
+        // if (gameSwitch) {
+        //     gameSwitch.checked = true;
+        //     gameSwitch.dispatchEvent(new Event('change'));
+        //     console.log('Game switch checked:', gameSwitch.checked);
+        // }
+    // } else {
+    }
     isDraggingField = false;
     isDraggingPlayer = false;
     isAdjustingDial = false;
     selectedPlayer = null;
+    offPivotTrigger = 1; // reset pivots
 });
 
 canvas.addEventListener('mouseleave', () => {
@@ -774,6 +977,8 @@ function drawLargeDialOverlay(player) {
 // =============================== END DIAL FOR ADJUSTING PLAYER
 
 // ===================================================== START DRAWING EVERYTHING
+// Add drawBall, drawBand, strokeRoundedRect (from previous responses)
+
 
 // =======================================DRAW A FOOTBALL FIELD
 function drawField() {
@@ -968,7 +1173,7 @@ function drawField() {
 
 // ======================================= END DRAW A FOOTBALL FIELD
 
-// =============== PLayer bases
+// =============== PLayer bases rounded if i want to use
 function drawRoundedRect(ctx, x, y, width, height, radius) {
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
@@ -999,19 +1204,185 @@ function strokeRoundedRect(ctx, x, y, width, height, radius) {
     ctx.stroke();
 }
 
-function renderGame() {
+
+function drawBall() {
+    if (!gameState.ball) return;
+    gameState.ball.trail = gameState.ball.trail || [];
+    gameState.ball.rotation = gameState.ball.rotation || 0;
+
+    let scale = 1;
+    if (gameState.ball.isMoving) {
+        gameState.ball.rotation += gameState.ball.vx * 0.02;
+        gameState.ball.trail.push({ x: gameState.ball.x, y: gameState.ball.y });
+        if (gameState.ball.trail.length > 20) gameState.ball.trail.shift();
+        const speed = Math.hypot(gameState.ball.vx, gameState.ball.vy);
+        const maxSpeed = 1.8; // Adjusted for yard units
+        const pct = Math.min(speed / maxSpeed, 1);
+        scale = 1 + pct * 0.9;
+        console.log('Ball speed:', speed, 'pct:', pct, 'scale:', scale);
+    }
+
+    ctx.save();
+    for (let i = 0; i < gameState.ball.trail.length; i++) {
+        const p = gameState.ball.trail[i];
+        const alpha = ((i + 1) / gameState.ball.trail.length) * 0.4;
+        ctx.fillStyle = `rgba(165,42,42,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(yardsToPixels(p.x), yardsToPixels(FIELD_HEIGHT - p.y), 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(yardsToPixels(gameState.ball.x), yardsToPixels(FIELD_HEIGHT - gameState.ball.y));
+    ctx.rotate(gameState.ball.rotation);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "brown";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.fillRect(-2, -2, 4, 4);
+    ctx.restore();
+}
+
+function drawBand(ctx, start, endRaw, opts = {}) {
+    console.log('Drawing band...');
+    const { maxDist = 100, tickSpacing = 10, tickLen = 6, color = 'white', lineWidth = 2, tickWidth = 1 } = opts;
+    const dx = endRaw.x - start.x;
+    const dy = endRaw.y - start.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.5) return;
+
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const drawDist = Math.min(dist, maxDist);
+    const ex = start.x + ux * drawDist;
+    const ey = start.y + uy * drawDist;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = tickWidth;
+    const numTicks = Math.floor(drawDist / tickSpacing);
+    const px = -uy;
+    const py = ux;
+
+    for (let i = 1; i <= numTicks; i++) {
+        const t = i * tickSpacing;
+        const tx = start.x + ux * t;
+        const ty = start.y + uy * t;
+        ctx.beginPath();
+        ctx.moveTo(tx + px * tickLen, ty + py * tickLen);
+        ctx.lineTo(tx - px * tickLen, ty - py * tickLen);
+        ctx.stroke();
+    }
+}
+
+function drawPassBall(ctx) {
+    if (!passMode || !gameState.ballCarrier) return;
+    const { x, y } = gameState.ballCarrier;
+    ctx.save();
+    ctx.translate(yardsToPixels(x), yardsToPixels(FIELD_HEIGHT - y));
+    ctx.fillStyle = 'orange';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2); // Fixed pixels like drawBall
+    ctx.fill();
+    ctx.restore();
+}
+// function updateBallCarrier() {
+//     const ballCarrier = players.find(p => p.hb);
+//     gameState.ballCarrier = ballCarrier ? { x: ballCarrier.x, y: ballCarrier.y } : null;
+//     //console.log('Ball carrier:', gameState.ballCarrier);
+// }
+// canvas.addEventListener('mousedown', (e) => {
+//     dragStart = { x: pixelsToYards(e.clientX), y: pixelsToYards(e.clientY) };
+// });
+// canvas.addEventListener('mousemove', (e) => {
+//     // Convert mouse coordinates to yards, accounting for canvas transformations
+//     const canvasX = e.clientX - canvas.width / 2;
+//     const canvasY = e.clientY - canvas.height / 2;
+//     const startX = pixelsToYards(canvasX / zoom + yardsToPixels(FIELD_WIDTH / 2) - panX / zoom);
+//     const startY = FIELD_HEIGHT - pixelsToYards(canvasY / zoom + yardsToPixels(FIELD_HEIGHT / 2) - panY / zoom);
+
+//     // Update global mouse coordinates (used in renderStopped)
+//     if (passMode) {
+//         mx = e.clientX;
+//         my = e.clientY;
+//         dragCurrent = { x: startX, y: startY };
+//         console.log('dragStart:', dragStart);
+//         console.log('dragCurrent:', dragCurrent);
+//     }
+//     // // Find hovered player
+//     //hoveredPlayer = null;
+//     // players.forEach(p => {
+//     //     if (p.hb) {
+//     //         hoveredPlayer = p;
+//     //         console.log('Hovered player:', hoveredPlayer.pid);
+//     //     }
+//     // });
+
+//     // // Start passMode if hovering over ball carrier
+//     // if (hoveredPlayer && hoveredPlayer.hb) {
+//     //     //passMode = true;
+//     //     dragStart = { x: hoveredPlayer.x, y: hoveredPlayer.y };
+//     // } else {
+//     //     //passMode = false; // Exit passMode if not over ball carrier
+//     //     dragStart = null;
+//     //     dragCurrent = null;
+//     // }
+
+//     // Update dragCurrent for band
+//     // if (passMode) {
+//     //     dragCurrent = { x: yardX, y: yardY };
+//     // }
+// });
+// canvas.addEventListener('mouseup', () => {
+//     passMode = false;
+// });
+//============================================================= MAIN GAME RENDER
+// ** this is where all the rendering occurrs
+// ** draw field and players. fieldDirty will cause the field to be drawn - drawField()
+// ** players are drawn here
+// =============================================================================
+function renderStopped() {
     //console.log('Rendering stopped... renderStopped()');
     const startTime = performance.now();
+    // updateBallCarrier(); // Set gameState.ballCarrier
     if (fieldDirty) {
         drawField();
         fieldDirty = false;
     }
+
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(fieldCanvas, 0, 0);
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(zoom, zoom);
     ctx.translate(-yardsToPixels(FIELD_WIDTH / 2) + panX / zoom, -yardsToPixels(FIELD_HEIGHT / 2) + panY / zoom);
+
+
+    // if (passMode && gameState.dragStart && gameState.dragCurrent) {
+    //     const startX = yardsToPixels(gameState.dragStart.x);
+    //     const startY = yardsToPixels(FIELD_HEIGHT - gameState.dragStart.y);
+    //     const endX = yardsToPixels(gameState.dragCurrent.x);
+    //     const endY = yardsToPixels(FIELD_HEIGHT - gameState.dragCurrent.y);
+    //     ctx.save();
+    //     ctx.strokeStyle = 'yellow';
+    //     ctx.lineWidth = 2;
+    //     ctx.beginPath();
+    //     ctx.moveTo(startX, startY);
+    //     ctx.lineTo(endX, endY);
+    //     ctx.stroke();
+    //     ctx.restore();
+    //     console.log('Simple line drawn: start=', { x: startX, y: startY }, 'end=', { x: endX, y: endY });
+    // }
 
     players.forEach(p => {
         ctx.save();
@@ -1049,7 +1420,10 @@ function renderGame() {
         if (image.complete) {
             ctx.drawImage(image, -yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
         }
+
+        // ======================== Highlight player with ball
         if (p.hb) {
+            //----------console.log('highlight hasBall', p.hb);
             ctx.fillStyle = 'white';
             ctx.beginPath();
             ctx.arc(yardsToPixels(0), yardsToPixels(0), yardsToPixels(0.5), 0, 2 * Math.PI);
@@ -1058,6 +1432,40 @@ function renderGame() {
             ctx.lineWidth = 3;
             ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
         }
+        if (p.hb && passMode) {
+            //----------console.log('highlight hasBall', p.hb);
+            ctx.fillStyle = 'blue';
+            ctx.beginPath();
+            ctx.arc(yardsToPixels(0), yardsToPixels(0), yardsToPixels(0.5), 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; // highlight with 50% opacity
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
+        }
+        if (p.hb && passMode && dragStart) {
+            //----------console.log('highlight hasBall', p.hb);
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(yardsToPixels(0), yardsToPixels(0), yardsToPixels(0.5), 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; // highlight with 50% opacity
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
+            dragStart = { x: p.x, y: p.y };
+        }
+
+        // ======================== Highlight eligible player for pass
+        if (passMode && p.ie === true) {
+            //--------------console.log('highlight isEligible', p.ie);
+            //ctx.fillStyle = 'yellow';
+            //ctx.beginPath();
+            //ctx.arc(yardsToPixels(0), yardsToPixels(0), yardsToPixels(0.5), 0, 2 * Math.PI);
+            //ctx.fill();
+            ctx.strokeStyle = "rgba(136, 255, 0, 0.9)"; // highlight with 50% opacity
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
+        }
+
         ctx.strokeStyle = 'yellow';
         ctx.lineWidth = yardsToPixels(0.1);
         ctx.beginPath();
@@ -1074,8 +1482,6 @@ function renderGame() {
         // ctx.textAlign = 'left';
     });
 
-
-    // ===================================== SHOW MEASURMENTS
     const endTime = performance.now();
     renderTimes.push(endTime - startTime);
     if (renderTimes.length > 60) renderTimes.shift();
@@ -1099,15 +1505,44 @@ function renderGame() {
     // ctx.fillText(formatClock(gameState.gameClock), yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 13));
     // ctx.fillText(`FPS: ${fps.toFixed(1)} Render: ${avgRenderTime.toFixed(2)}ms Data: ${(bytesSent / 1024).toFixed(2)}KB sent, ${(bytesReceived / 1024).toFixed(2)}KB received, ${lastMessageBytes.toFixed(2)}KB/tick`, yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 9));
     // ctx.fillText(`Game: ${gameRunning ? 'Running' : 'Paused'} Zoom: ${zoom.toFixed(2)} Mouse: (${mx.toFixed(0)}, ${my.toFixed(0)}) Yards: (${yardX.toFixed(2)}, ${yardY.toFixed(2)})`, yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 5));
+
+    // Draw band in passMode
+    if (passMode && isDraggingBand) {
+        console.log('Rendering band: dragStart=', gameState.dragStart, 'dragCurrent=', gameState.dragCurrent);
+        drawBand(ctx,
+            { x: yardsToPixels(gameState.dragStart.x), y: yardsToPixels(FIELD_HEIGHT - gameState.dragStart.y) },
+            { x: yardsToPixels(gameState.dragCurrent.x), y: yardsToPixels(FIELD_HEIGHT - gameState.dragCurrent.y) },
+            {
+                maxDist: yardsToPixels(12),
+                tickSpacing: yardsToPixels(1),
+                tickLen: yardsToPixels(0.3),
+                color: 'yellow',
+                lineWidth: 2,
+                tickWidth: 1
+            }
+        );
+        console.log('Drawing band done');
+    }
+
+    // == DRaw the ball
+    if (passMode && isBallThrown && gameState.ball.isMoving) {
+        drawBall(ctx);
+        console.log('Drawing ball done');
+    }
+
     ctx.restore();
 }
+
+
 
 // =============================== RENDER FOR GAME RUNNING OR GAME STOPPED
 function render() {
     if (gameRunning) {
-        renderGame();
+        renderStopped();
     } else {
-        renderGame();
+        renderStopped();
         messageCanvas.render();
     }
 }
+
+// Merge with your zoom, drag/rotate logic
