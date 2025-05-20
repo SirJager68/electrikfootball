@@ -43,7 +43,6 @@ let isDragging = false;
 let isAdjustingDial = false;
 let isRotatePlayer = false;
 let selectedPlayer = null;
-let selectedPlayerR = null;
 let lastMouseX = 0;
 let lastMouseY = 0;
 let dragOffsetX = 0;
@@ -97,17 +96,14 @@ let gameState = {
     homeScore: 0,
     awayScore: 0,
     currentPlay: null,
-    playMode: 0,
-    ball: {
-        x: 0,
-        y: 0,
-        isMoving: false,
-    }
 };
 
-let ballColor = 'white';
-let isDraggingBand = false;
-let showReceivers = false;
+// const scorebug = new Scorebug('scorebugCanvas', {
+//     width: 720,
+//     height: 60,
+//     pixelsPerYard: pixelsPerYard
+// });
+// scorebug.update(gameState);
 
 let gameStarted = false;
 const LOAD_TIMEOUT = 1000; // 2 seconds
@@ -381,9 +377,6 @@ ws.onmessage = (msg) => {
                     // Optional: Visualize tackle (e.g., flash player)
                 }
             }
-            gameState.playMode = data.m;
-            gameState.ball.isMoving = false;
-            ballColor = 'white';
             scorebug.update(gameState);
             debugScreen.update(gameState, players); // Update debug screen
             if (gameStarted) render();
@@ -469,32 +462,56 @@ ws.onmessage = (msg) => {
                 messageCanvas.addMessage(data.message.text, data.message.type);
                 console.log(`Processed message: ${data.message.text}, type: ${data.message.type}`);
             }
-            gameState.playMode = data.m;
-            gameState.ball.isMoving = false;
-            ballColor = 'white';
-            selectedPlayerR = null;
             scorebug.update(gameState);
             debugScreen.update(gameState, players); // Update debug screen
             //if (gameStarted) {
             fieldDirty = true; // Force redraw on reset
             render();
             //}
-        } else if (data.type === 'ballState') {
-            players = data.pl.filter(p => p && p.pid);
-            gameState.ball = data.b;
-            gameState.ball.x = data.b.x;
-            gameState.ball.y = data.b.y;
-            gameState.ball.isMoving = data.b.m;
-            console.log('Ball state updated:', gameState.ball);
-            if (data.message) {
-                messageCanvas.addMessage(data.message.text, data.message.type);
-                console.log(`Processed message: ${data.message.text}, type: ${data.message.type}`);
-            }
-            gameState.playMode = data.m;
-            gameRunning = data.r;
-            ballColor = 'blue';
-            toggleVibrateSound();
         } else {
+            // console.log('Received full state:', data);
+            // const {
+            //     i: serverId,
+            //     s: serverClock,
+            //     p: serverPlayClock,
+            //     r: serverRunning,
+            //     pl: serverPlayers,
+            //     qtr: serverQtr,
+            //     down: serverDown,
+            //     ytg: serverYardsToGo,
+            //     poss: serverPossession,
+            //     los: serverLos,
+            //     fdl: serverFdl,
+            //     homeScore: serverHomeScore,
+            //     awayScore: serverAwayScore,
+            //     playState: serverPlayState,
+            //     homeTD: serverHomeTD,
+            //     awayTD: serverAwayTD,
+            //     gameStart: serverGameStart
+            // } = data;
+            // gameState.id = serverId !== undefined ? serverId : gameState.id;
+            // gameState.gameRunning = serverRunning !== undefined ? serverRunning : gameState.gameRunning;
+            // gameState.players = serverPlayers !== undefined ? serverPlayers : gameState.players;
+            // gameState.gameClock = serverClock !== undefined ? serverClock : gameState.gameClock;
+            // gameState.playClock = serverPlayClock !== undefined ? serverPlayClock : gameState.playClock;
+            // gameState.qtr = serverQtr !== undefined ? serverQtr : gameState.qtr;
+            // gameState.down = serverDown !== undefined ? serverDown : gameState.down;
+            // gameState.yardsToGo = serverYardsToGo !== undefined ? Math.round(serverYardsToGo) : gameState.yardsToGo;
+            // gameState.possession = serverPossession !== undefined ? serverPossession : gameState.possession;
+            // gameState.los = serverLos !== undefined ? serverLos : gameState.los;
+            // gameState.firstDownLine = serverFdl !== undefined ? serverFdl : gameState.firstDownLine;
+            // gameState.homeTeam.score = serverHomeScore !== undefined ? serverHomeScore : gameState.homeTeam.score;
+            // gameState.awayTeam.score = serverAwayScore !== undefined ? serverAwayScore : gameState.awayTeam.score;
+            // gameState.playState = serverPlayState !== undefined ? serverPlayState : gameState.playState;
+            // gameState.homeTD = serverHomeTD !== undefined ? serverHomeTD : gameState.homeTD;
+            // gameState.awayTD = serverAwayTD !== undefined ? serverAwayTD : gameState.awayTD;
+            // gameState.gameStart = serverGameStart !== undefined ? serverGameStart : gameState.gameStart;
+            // // Update UI
+            // scorebug.update(gameState);
+            // debugScreen.update(gameState, gameState.players);
+            // fieldDirty = true;
+            // render();
+
 
             //== INITIAL
             const { s, p, r: serverRunning, pl: serverPlayers } = data;
@@ -502,21 +519,20 @@ ws.onmessage = (msg) => {
             players = serverPlayers || players;
             clockSeconds = s !== undefined ? s : clockSeconds;
             playClock = p !== undefined ? p : playClock;
-            toggleVibrateSound();
             //console.log('Received full state:');
             //console.log('>>> else Received full state:', JSON.stringify(data));
             //console.log(players.map(p => `${p.pid}: x=${p.x.toFixed(2)}, y=${p.y.toFixed(2)}, h=${p.h.toFixed(2)}`));
             //== END INITIAL
 
             // ============================================ TOGGLE VIBRATE SOUND ON/OFF
-            // if (gameRunning && !vibrateSound) { // ========TOGGLE SOUND ON/OFF
-            //     startVibratingSound();
-            //     vibrateSound = true;
-            //     gameState.currentPlay = 'running';
-            // } else if (!gameRunning && vibrateSound) {
-            //     stopVibratingSound();
-            //     vibrateSound = false;
-            // }
+            if (gameRunning && !vibrateSound) { // ========TOGGLE SOUND ON/OFF
+                startVibratingSound();
+                vibrateSound = true;
+                gameState.currentPlay = 'running';
+            } else if (!gameRunning && vibrateSound) {
+                stopVibratingSound();
+                vibrateSound = false;
+            }
             // ============================================ END TOGGLE VIBRATE SOUND ON/OFF
 
         }
@@ -526,19 +542,6 @@ ws.onmessage = (msg) => {
         console.error('Error processing WebSocket message:', error, msg.data);
     }
 };
-
-function toggleVibrateSound() {
-    // ============================================ TOGGLE VIBRATE SOUND ON/OFF
-    if (gameRunning && !vibrateSound) { // ========TOGGLE SOUND ON/OFF
-        startVibratingSound();
-        vibrateSound = true;
-        gameState.currentPlay = 'running';
-    } else if (!gameRunning && vibrateSound) {
-        stopVibratingSound();
-        vibrateSound = false;
-    }
-    // ============================================ END TOGGLE VIBRATE SOUND ON/OFF
-}
 
 // =================================== END WEBSOCKET - get message to server
 
@@ -572,16 +575,11 @@ document.addEventListener('keydown', (e) => {
         gameState.currentPlay = 'running';
         ws.send(JSON.stringify({ type: 'toggleGame', gameID }));
     } else if (e.code === 'KeyR' && gameState.currentPlay !== 'running') {
-        e.preventDefault();
         ws.send(JSON.stringify({ type: 'reset', gameID }));
     } else if (e.code === 'KeyQ') {
-        e.preventDefault();
         ws.send(JSON.stringify({ type: 'restart', gameID }));
-    } else if (e.code === 'KeyP') {
-        e.preventDefault();
-        showReceivers = true; //== show receivers
+    } else if (e.code === 'p') {
         ws.send(JSON.stringify({ type: 'passMode', gameID }));
-        console.log('===Event press p - Pass mode toggled');
     }
 });
 // ====================================== END GAME SWITCH
@@ -651,24 +649,12 @@ canvas.addEventListener('mousedown', (e) => {
         players.find(p => isMouseHoverPlayer(mx, my, p));
     //console.log(`Selected player: ${selectedPlayer ? selectedPlayer.pid : 'none'}`);
     if (selectedPlayer && !gameRunning) {
-        if (e.button === 2) {    // == right click to select player
-            e.preventDefault();
-            selectedPlayerR = selectedPlayer.pid;
-            gameState.dragStart = { x: gameState.ball.x , y: gameState.ball.y };
-            gameState.dragCurrent = getMouseYardCoords(mx, my);
-            ws.send(JSON.stringify({ // send to server to broadcast to all clients
-                type: 'passMode',
-                selectedPlayerR: selectedPlayerR
-            }));
-            console.log('Selected player for pass:', selectedPlayerR);
-            console.log('dragStart:', gameState.dragStart.x, gameState.dragStart.y);
-            //lastMouseX = mx;
-        } else if (e.button === 0 && selectedPlayerR) { // == left click to adjust dial
-            isDraggingBand = true;
+        if (e.button === 2) {    // == right click
+
+            lastMouseX = mx;
         } else {
             isDraggingPlayer = true;
             isRotatePlayer = true;
-            //console.log('Selected player:', selectedPlayer.pid);
         }
     } else {
         isDraggingField = true;
@@ -676,16 +662,13 @@ canvas.addEventListener('mousedown', (e) => {
         lastMouseY = my;
     }
 
-    if (e.button === 1) {
+    if ( e.button ===1) {
         zoom = 1;
-        panX = 0;
+        panX = 0;  
         panY = 0;
         fieldDirty = true;
         render();
     }
-});
-canvas.addEventListener('contextmenu', (e) => {
-    e.preventDefault(); // Prevent browser context menu
 });
 
 canvas.addEventListener('mousemove', (e) => {
@@ -730,41 +713,11 @@ canvas.addEventListener('mousemove', (e) => {
         lastMouseX = mx;
         lastMouseY = my;
         fieldDirty = true;
-    } else if (selectedPlayerR) {
-        gameState.dragCurrent = getMouseYardCoords(mx, my);
     }
-    
     if (gameStarted) render();
 });
 
 canvas.addEventListener('mouseup', () => {
-    // == let go of band and throw pass
-    if (isDraggingBand) {
-        isDraggingBand= false;
-        const dx = gameState.dragStart.x - gameState.dragCurrent.x;
-        const dy = gameState.dragStart.y - gameState.dragCurrent.y;
-        const angle = Math.atan2(dy, dx);
-        const power = Math.min(Math.hypot(dx, dy), 200) * 0.15;
-        const ballx = gameState.dragStart.x;
-        const bally = gameState.dragStart.y;
-        const ballvx = Math.cos(angle) * power;
-        const ballvy = Math.sin(angle) * power;
-        showReceivers = false; //== stop highlighting receivers
-        selectedPlayerR = null;
-        ws.send(JSON.stringify({
-            type: 'passMoving',
-            ballx : gameState.dragStart.x,
-            bally : gameState.dragStart.y,
-            balldx : dx,
-            balldy : dy,
-            ballvx: ballvx,
-            ballvy: ballvy,
-            selectedPlayerR: selectedPlayerR
-        }));
-        messageCanvas.addMessage(`TEAM just threw a pass`, 'info');
-        console.log(`Pass thrown with angle: ${angle.toFixed(2)}, power: ${power.toFixed(2)}`);
-        console.log('=======pass variables', ballx, bally, dx, dy, ballvx, ballvy);
-    }
     isDraggingField = false;
     isDraggingPlayer = false;
     isAdjustingDial = false;
@@ -1018,87 +971,6 @@ function drawField() {
 
 // ======================================= END DRAW A FOOTBALL FIELD
 
-// ======================================= DRAW A FOOTBALL
-function drawBall() {
-    if (!gameState.ball) return;
-    gameState.ball.trail = gameState.ball.trail || [];
-    gameState.ball.rotation = gameState.ball.rotation || 0;
-
-    let scale = 1;
-    if (gameState.ball.isMoving) {
-        gameState.ball.rotation += gameState.ball.vx * 0.02;
-        gameState.ball.trail.push({ x: gameState.ball.x, y: gameState.ball.y });
-        if (gameState.ball.trail.length > 20) gameState.ball.trail.shift();
-        const speed = Math.hypot(gameState.ball.vx, gameState.ball.vy) ;
-        const maxSpeed = 1; // Adjusted for yard units
-        const pct = Math.min(speed / maxSpeed, 1);
-        scale = 1 + pct * 0.9;
-        console.log('Ball speed:', speed, 'pct:', pct, 'scale:', scale);
-    }
-
-    ctx.save();
-    for (let i = 0; i < gameState.ball.trail.length; i++) {
-        const p = gameState.ball.trail[i];
-        const alpha = ((i + 1) / gameState.ball.trail.length) * 0.4;
-        ctx.fillStyle = `rgba(165,42,42,${alpha})`;
-        ctx.beginPath();
-        ctx.arc(yardsToPixels(p.x), yardsToPixels(FIELD_HEIGHT - p.y), 5, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(yardsToPixels(gameState.ball.x), yardsToPixels(FIELD_HEIGHT - gameState.ball.y));
-    ctx.rotate(gameState.ball.rotation);
-    ctx.scale(scale, scale);
-    ctx.fillStyle = "brown";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "white";
-    ctx.fillRect(-2, -2, 4, 4);
-    ctx.restore();
-}
-
-function drawBand(ctx, start, endRaw, opts = {}) {
-    console.log('Drawing band...');
-    const { maxDist = 100, tickSpacing = 10, tickLen = 6, color = 'white', lineWidth = 2, tickWidth = 1 } = opts;
-    const dx = endRaw.x - start.x;
-    const dy = endRaw.y - start.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.5) return;
-
-    const ux = dx / dist;
-    const uy = dy / dist;
-    const drawDist = Math.min(dist, maxDist);
-    const ex = start.x + ux * drawDist;
-    const ey = start.y + uy * drawDist;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = tickWidth;
-    const numTicks = Math.floor(drawDist / tickSpacing);
-    const px = -uy;
-    const py = ux;
-
-    for (let i = 1; i <= numTicks; i++) {
-        const t = i * tickSpacing;
-        const tx = start.x + ux * t;
-        const ty = start.y + uy * t;
-        ctx.beginPath();
-        ctx.moveTo(tx + px * tickLen, ty + py * tickLen);
-        ctx.lineTo(tx - px * tickLen, ty - py * tickLen);
-        ctx.stroke();
-    }
-}
-
-
 // =============== PLayer bases
 function drawRoundedRect(ctx, x, y, width, height, radius) {
     ctx.beginPath();
@@ -1148,6 +1020,7 @@ function renderGame() {
         ctx.save();
         ctx.translate(yardsToPixels(p.x), yardsToPixels(FIELD_HEIGHT - p.y));
         ctx.rotate(-p.h);
+        //ctx.fillStyle = p.pid.includes('-h-') ? 'red' : 'blue';
         ctx.fillStyle = p === selectedPlayer && isDraggingPlayer ? 'yellow' : (p.pid.includes('-h-') ? gameState.homeTeamColor : gameState.awayTeamColor);
         //ctx.fillStyle = p.pid === isDraggingPlayer ? "yellow" : this.baseColor;
         ctx.fillRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
@@ -1175,29 +1048,17 @@ function renderGame() {
             ctx.lineWidth = yardsToPixels(0.2);
             ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
         }
-        if (p.pid === selectedPlayerR) {
-            ctx.strokeStyle = 'yellow';
-            ctx.lineWidth = yardsToPixels(0.4);
-            ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
-        }
         const image = p.pid.includes('-h-') ? homeImage : awayImage;
         if (image.complete) {
             ctx.drawImage(image, -yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
         }
         if (p.hb) {
-            ctx.fillStyle = ballColor;
+            ctx.fillStyle = 'white';
             ctx.beginPath();
             ctx.arc(yardsToPixels(0), yardsToPixels(0), yardsToPixels(0.5), 0, 2 * Math.PI);
             ctx.fill();
             ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; // highlight with 50% opacity
             ctx.lineWidth = 3;
-            ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
-        }
-        // ======================== Highlight eligible player for pass
-        if (gameState.playMode === 1 && p.ie === true && showReceivers) {
-            //console.log('highlight isEligible', p.ie);
-            ctx.strokeStyle = "rgba(136, 255, 0, 0.9)"; // highlight with 50% opacity
-            ctx.lineWidth = 2;
             ctx.strokeRect(-yardsToPixels(baseWidth) / 2, -yardsToPixels(baseHeight) / 2, yardsToPixels(baseWidth), yardsToPixels(baseHeight));
         }
         ctx.strokeStyle = 'yellow';
@@ -1215,8 +1076,6 @@ function renderGame() {
         // ctx.fillText(`(${p.x.toFixed(2)}, ${p.y.toFixed(2)})`, yardsToPixels(p.x), yardsToPixels(FIELD_HEIGHT - p.y) - yardsToPixels(baseWidth));
         // ctx.textAlign = 'left';
     });
-
-
 
 
     // ===================================== SHOW MEASURMENTS
@@ -1243,30 +1102,6 @@ function renderGame() {
     // ctx.fillText(formatClock(gameState.gameClock), yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 13));
     // ctx.fillText(`FPS: ${fps.toFixed(1)} Render: ${avgRenderTime.toFixed(2)}ms Data: ${(bytesSent / 1024).toFixed(2)}KB sent, ${(bytesReceived / 1024).toFixed(2)}KB received, ${lastMessageBytes.toFixed(2)}KB/tick`, yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 9));
     // ctx.fillText(`Game: ${gameRunning ? 'Running' : 'Paused'} Zoom: ${zoom.toFixed(2)} Mouse: (${mx.toFixed(0)}, ${my.toFixed(0)}) Yards: (${yardX.toFixed(2)}, ${yardY.toFixed(2)})`, yardsToPixels(5), yardsToPixels(FIELD_HEIGHT - 5));
-
-    // Draw band in passMode
-    if (gameState.playMode === 1 && isDraggingBand) {
-        console.log('Rendering band: dragStart=', gameState.dragStart, 'dragCurrent=', gameState.dragCurrent);
-        drawBand(ctx,
-            { x: yardsToPixels(gameState.dragStart.x), y: yardsToPixels(FIELD_HEIGHT - gameState.dragStart.y) },
-            { x: yardsToPixels(gameState.dragCurrent.x), y: yardsToPixels(FIELD_HEIGHT - gameState.dragCurrent.y) },
-            {
-                maxDist: yardsToPixels(12),
-                tickSpacing: yardsToPixels(1),
-                tickLen: yardsToPixels(0.3),
-                color: 'yellow',
-                lineWidth: 2,
-                tickWidth: 1
-            }
-        );
-        console.log('Drawing band done');
-    }
-    if (gameState.ball.isMoving) {
-        console.log('Ball is moving');
-        drawBall();
-    }
-
-
     ctx.restore();
 }
 

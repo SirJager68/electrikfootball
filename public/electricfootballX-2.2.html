@@ -2981,9 +2981,10 @@
             ball.vy *= 0.97;
 
             const speed = Math.hypot(ball.vx, ball.vy);
+            console.log("Ball speed:", speed);
 
             // Interception logic
-            const defenders = isTeam1Offense ? team2Players : team1Players;
+            const defenders = isTeam1Offense ? team2Players : team1Players;r  
             for (let defender of defenders) {
                 const dx = ball.x - defender.x;
                 const dy = ball.y - defender.y;
@@ -3036,7 +3037,7 @@
             }
 
             // Stop the ball if too slow
-            if (speed < 0.1) {
+            if (speed < 0.01) {
                 ball = null;
                 selectedReceiver = null;
                 console.log("Incomplete pass.");
